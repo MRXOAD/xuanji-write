@@ -219,6 +219,70 @@ def test_relationship_subgraph_fallbacks_to_snapshot_when_events_missing(temp_pr
     assert graph["edges"][0]["type"] == "同盟"
 
 
+def test_relationship_mermaid_node_ids_are_stable_and_unique_for_chinese_entities(temp_project):
+    manager = IndexManager(temp_project)
+    manager.upsert_entity(
+        EntityMeta(
+            id="char:许三更",
+            type="角色",
+            canonical_name="许三更",
+            current={},
+            first_appearance=1,
+            last_appearance=2,
+            is_protagonist=True,
+        )
+    )
+    manager.upsert_entity(
+        EntityMeta(
+            id="char:沈见秋",
+            type="角色",
+            canonical_name="沈见秋",
+            current={},
+            first_appearance=1,
+            last_appearance=2,
+        )
+    )
+    manager.upsert_entity(
+        EntityMeta(
+            id="char:韩五尺",
+            type="角色",
+            canonical_name="韩五尺",
+            current={},
+            first_appearance=1,
+            last_appearance=2,
+        )
+    )
+    manager.record_relationship_event(
+        RelationshipEventMeta(
+            from_entity="char:许三更",
+            to_entity="char:沈见秋",
+            type="同伴",
+            chapter=1,
+            action="create",
+            polarity=1,
+            strength=0.8,
+        )
+    )
+    manager.record_relationship_event(
+        RelationshipEventMeta(
+            from_entity="char:许三更",
+            to_entity="char:韩五尺",
+            type="敌对",
+            chapter=2,
+            action="create",
+            polarity=-1,
+            strength=0.9,
+        )
+    )
+
+    graph = manager.build_relationship_subgraph("char:许三更", depth=1, chapter=2, top_edges=10)
+    mermaid = manager.render_relationship_subgraph_mermaid(graph)
+    lines = [line.strip() for line in mermaid.splitlines() if "[\"" in line]
+    node_ids = [line.split("[", 1)[0].strip() for line in lines]
+    assert len(node_ids) == 3
+    assert len(set(node_ids)) == 3
+
+
 def test_relationship_graph_cli_commands(temp_project, monkeypatch, capsys):
     manager = IndexManager(temp_project)
     manager.upsert_entity(

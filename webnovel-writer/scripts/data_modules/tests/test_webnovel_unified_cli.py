@@ -3,6 +3,7 @@
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -44,6 +45,31 @@ def test_init_does_not_resolve_existing_project_root(monkeypatch):
     assert int(exc.value.code or 0) == 0
     assert called["script_name"] == "init_project.py"
     assert called["argv"] == ["proj-dir", "测试书", "修仙"]
+
+
+def test_helpers_cover_project_root_parsing_and_missing_script(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+
+    monkeypatch.setattr(module, "resolve_project_root", lambda raw=None: Path("/tmp/book"))
+    assert module._resolve_root(None) == Path("/tmp/book")
+    assert module._strip_project_root_args(["--project-root", "/a", "index", "--project-root=/b", "stats"]) == [
+        "index",
+        "stats",
+    ]
+
+    missing_dir = tmp_path / "missing"
+    monkeypatch.setattr(module, "_scripts_dir", lambda: missing_dir)
+    with pytest.raises(FileNotFoundError):
+        module._run_script("nope.py", [])
+
+    monkeypatch.setattr(module, "_resolve_root", lambda explicit_project_root=None: Path("/tmp/book"))
+    monkeypatch.setattr(sys, "argv", ["webnovel", "where"])
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    assert "/tmp/book" in capsys.readouterr().out
 
 
 def test_extract_context_forwards_with_resolved_project_root(monkeypatch, tmp_path):
@@ -130,6 +156,165 @@ def test_preflight_fails_when_required_scripts_are_missing(monkeypatch, tmp_path
     assert int(exc.value.code or 0) == 1
     assert '"ok": false' in captured.out
     assert '"name": "entry_script"' in captured.out
+
+
+def test_use_command_updates_pointer_and_registry(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+
+    workspace_root = (tmp_path / "workspace").resolve()
+    project_root = (workspace_root / "book").resolve()
+    registry_path = (tmp_path / "home" / "workspaces.json").resolve()
+    expected_pointer = workspace_root / ".codex" / ".webnovel-current-project"
+    called = {}
+
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    def _fake_write_pointer(project_root_arg, workspace_root=None):
+        called["pointer"] = (project_root_arg, workspace_root)
+        return expected_pointer
+
+    def _fake_update_registry(workspace_root=None, project_root=None):
+        called["registry"] = (workspace_root, project_root)
+        return registry_path
+
+    monkeypatch.setattr(module, "write_current_project_pointer", _fake_write_pointer)
+    monkeypatch.setattr(module, "update_global_registry_current_project", _fake_update_registry)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["webnovel", "use", str(project_root), "--workspace-root", str(workspace_root)],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    captured = capsys.readouterr()
+    assert int(exc.value.code or 0) == 0
+    assert called["pointer"][0] == project_root
+    assert called["pointer"][1] == workspace_root
+    assert called["registry"][0] == workspace_root
+    assert called["registry"][1] == project_root
+    assert f"workspace pointer: {expected_pointer}" in captured.out
+    assert f"global registry: {registry_path}" in captured.out
+
+
+def test_use_command_handles_skipped_pointer_and_registry(monkeypatch, tmp_path, capsys):
+    module = _load_webnovel_module()
+
+    workspace_root = (tmp_path / "workspace").resolve()
+    project_root = (workspace_root / "book").resolve()
+
+    (project_root / ".webnovel").mkdir(parents=True, exist_ok=True)
+    (project_root / ".webnovel" / "state.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(module, "write_current_project_pointer", lambda *args, **kwargs: None)
+    monkeypatch.setattr(module, "update_global_registry_current_project", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["webnovel", "use", str(project_root), "--workspace-root", str(workspace_root)],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    captured = capsys.readouterr()
+    assert int(exc.value.code or 0) == 0
+    assert "workspace pointer: (skipped)" in captured.out
+    assert "global registry: (skipped)" in captured.out
+
+
+def test_llm_command_forwards_with_resolved_project_root(monkeypatch, tmp_path):
+    module = _load_webnovel_module()
+
+    book_root = (tmp_path / "book").resolve()
+    called = {}
+
+    def _fake_resolve(explicit_project_root=None):
+        return book_root
+
+    def _fake_run_script(script_name, argv):
+        called["script_name"] = script_name
+        called["argv"] = list(argv)
+        return 0
+
+    monkeypatch.setattr(module, "_resolve_root", _fake_resolve)
+    monkeypatch.setattr(module, "_run_script", _fake_run_script)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "webnovel",
+            "--project-root",
+            str(tmp_path),
+            "llm",
+            "env-check",
+            "--format",
+            "json",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    assert called["script_name"] == "llm_adapter.py"
+    assert called["argv"] == [
+        "--project-root",
+        str(book_root),
+        "env-check",
+        "--format",
+        "json",
+    ]
+
+
+def test_deepseek_alias_still_forwards_with_resolved_project_root(monkeypatch, tmp_path):
+    module = _load_webnovel_module()
+
+    book_root = (tmp_path / "book").resolve()
+    called = {}
+
+    monkeypatch.setattr(module, "_resolve_root", lambda explicit_project_root=None: book_root)
+    monkeypatch.setattr(
+        module,
+        "_run_script",
+        lambda script_name, argv: called.update({"script_name": script_name, "argv": list(argv)}) or 0,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "webnovel",
+            "--project-root",
+            str(tmp_path),
+            "deepseek",
+            "env-check",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+
+    assert int(exc.value.code or 0) == 0
+    assert called["script_name"] == "deepseek_adapter.py"
+    assert called["argv"] == [
+        "--project-root",
+        str(book_root),
+        "env-check",
+    ]
+
+
+def test_run_data_module_handles_missing_main_and_system_exit(monkeypatch):
+    module = _load_webnovel_module()
+
+    monkeypatch.setattr(module.importlib, "import_module", lambda name: SimpleNamespace())
+    with pytest.raises(RuntimeError):
+        module._run_data_module("missing", [])
+
+    fake_module = SimpleNamespace(main=lambda: (_ for _ in ()).throw(SystemExit(7)))
+    monkeypatch.setattr(module.importlib, "import_module", lambda name: fake_module)
+    assert module._run_data_module("with_exit", ["arg"]) == 7
 
 
 def test_quality_trend_report_writes_to_book_root_when_input_is_workspace_root(tmp_path, monkeypatch):

@@ -89,7 +89,7 @@ def _run_data_module(module: str, argv: list[str]) -> int:
 
 def _run_script(script_name: str, argv: list[str]) -> int:
     """
-    Run a script under `.claude/scripts/` via a subprocess.
+    Run a repo script via a subprocess.
 
     用途：兼容没有 main() 的脚本（例如 workflow_manager.py）。
     """
@@ -128,7 +128,9 @@ def _build_preflight_report(explicit_project_root: Optional[str]) -> dict:
         checks.append({"name": "project_root", "ok": True, "path": project_root})
     except Exception as exc:
         project_root_error = str(exc)
-        checks.append({"name": "project_root", "ok": False, "path": explicit_project_root or "", "error": project_root_error})
+        checks.append(
+            {"name": "project_root", "ok": False, "path": explicit_project_root or "", "error": project_root_error}
+        )
 
     return {
         "ok": all(bool(item["ok"]) for item in checks),
@@ -249,6 +251,12 @@ def main() -> None:
     p_extract_context.add_argument("--chapter", type=int, required=True, help="目标章节号")
     p_extract_context.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")
 
+    p_llm = sub.add_parser("llm", help="转发到 llm_adapter.py")
+    p_llm.add_argument("args", nargs=argparse.REMAINDER)
+
+    p_deepseek = sub.add_parser("deepseek", help="转发到 deepseek_adapter.py")
+    p_deepseek.add_argument("args", nargs=argparse.REMAINDER)
+
     # 兼容：允许 `--project-root` 出现在任意位置（减少 agents/skills 拼命令的出错率）
     from .cli_args import normalize_global_project_root
 
@@ -303,6 +311,10 @@ def main() -> None:
     if tool == "extract-context":
         return_args = [*forward_args, "--chapter", str(args.chapter), "--format", str(args.format)]
         raise SystemExit(_run_script("extract_chapter_context.py", return_args))
+    if tool == "llm":
+        raise SystemExit(_run_script("llm_adapter.py", [*forward_args, *rest]))
+    if tool == "deepseek":
+        raise SystemExit(_run_script("deepseek_adapter.py", [*forward_args, *rest]))
 
     raise SystemExit(2)
 

@@ -65,9 +65,7 @@ def _build_review_rows(records: List[Dict[str, Any]]) -> List[str]:
         low = _to_int(severities.get("low"))
         range_text = f"{_to_int(row.get('start_chapter'))}-{_to_int(row.get('end_chapter'))}"
         score = _to_float(row.get("overall_score"))
-        rows.append(
-            f"| {range_text} | {score:.1f} | {critical} | {high} | {medium} | {low} |"
-        )
+        rows.append(f"| {range_text} | {score:.1f} | {critical} | {high} | {medium} | {low} |")
     return rows
 
 
@@ -87,9 +85,7 @@ def _build_checklist_rows(records: List[Dict[str, Any]]) -> List[str]:
             required_rate = completed_required / required_items
         else:
             required_rate = 1.0
-        rows.append(
-            f"| {chapter} | {score:.1f} | {_percent(completion)} | {_percent(required_rate)} |"
-        )
+        rows.append(f"| {chapter} | {score:.1f} | {_percent(completion)} | {_percent(required_rate)} |")
     return rows
 
 
@@ -223,9 +219,7 @@ def main() -> None:
 
     limit = max(1, int(args.limit))
     output_path = (
-        Path(args.output).expanduser().resolve()
-        if args.output
-        else (cfg.webnovel_dir / "reports" / "quality-trend.md")
+        Path(args.output).expanduser().resolve() if args.output else (cfg.webnovel_dir / "reports" / "quality-trend.md")
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -236,6 +230,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     import sys
+
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()

@@ -85,11 +85,7 @@ def normalize_foreshadowing_status(
         return default
 
     text_lower = text.lower()
-    if (
-        text in _RESOLVED_STATUS_TEXT
-        or text_lower in _RESOLVED_STATUS_TEXT
-        or FORESHADOWING_STATUS_RESOLVED in text
-    ):
+    if text in _RESOLVED_STATUS_TEXT or text_lower in _RESOLVED_STATUS_TEXT or FORESHADOWING_STATUS_RESOLVED in text:
         return FORESHADOWING_STATUS_RESOLVED
 
     if text in _PENDING_STATUS_TEXT or text_lower in _PENDING_STATUS_TEXT:
@@ -246,4 +242,3 @@ def normalize_state_runtime_sections(state: Dict[str, Any]) -> Dict[str, Any]:
 
     state["chapter_meta"] = normalize_chapter_meta(state.get("chapter_meta", {}))
     return state
-

@@ -25,6 +25,7 @@ from .observability import safe_log_tool_call
 @dataclass
 class DisambiguationResult:
     """消歧结果"""
+
     mention: str
     entity_id: Optional[str]
     confidence: float
@@ -89,12 +90,7 @@ class EntityLinker:
             return ("manual", False, f"需人工确认 (confidence: {confidence:.2f})")
 
     def process_uncertain(
-        self,
-        mention: str,
-        candidates: List[str],
-        suggested: str,
-        confidence: float,
-        context: str = ""
+        self, mention: str, candidates: List[str], suggested: str, confidence: float, context: str = ""
     ) -> DisambiguationResult:
         """
         处理不确定的实体匹配
@@ -109,17 +105,14 @@ class EntityLinker:
             confidence=confidence,
             candidates=candidates,
             adopted=adopt,
-            warning=warning
+            warning=warning,
         )
 
         return result
 
     # ==================== 批量处理 ====================
 
-    def process_extraction_result(
-        self,
-        uncertain_items: List[Dict]
-    ) -> Tuple[List[DisambiguationResult], List[str]]:
+    def process_extraction_result(self, uncertain_items: List[Dict]) -> Tuple[List[DisambiguationResult], List[str]]:
         """
         处理 AI 提取结果中的 uncertain 项
 
@@ -134,7 +127,7 @@ class EntityLinker:
                 candidates=item.get("candidates", []),
                 suggested=item.get("suggested", ""),
                 confidence=item.get("confidence", 0.0),
-                context=item.get("context", "")
+                context=item.get("context", ""),
             )
             results.append(result)
 
@@ -143,10 +136,7 @@ class EntityLinker:
 
         return results, warnings
 
-    def register_new_entities(
-        self,
-        new_entities: List[Dict]
-    ) -> List[str]:
+    def register_new_entities(self, new_entities: List[Dict]) -> List[str]:
         """
         注册新实体的别名 (v5.1 引入，v5.4 沿用)
 
@@ -177,6 +167,7 @@ class EntityLinker:
 
 
 # ==================== CLI 接口 ====================
+
 
 def main():
     import argparse
@@ -217,10 +208,10 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     linker = EntityLinker(config)

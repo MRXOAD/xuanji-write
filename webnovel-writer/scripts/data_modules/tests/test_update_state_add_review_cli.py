@@ -42,4 +42,3 @@ def test_update_state_cli_add_review_writes_checkpoint(tmp_path, monkeypatch):
     assert isinstance(checkpoints, list)
     assert checkpoints[-1]["chapters"] == "1-2"
     assert checkpoints[-1]["report"] == report_file
-

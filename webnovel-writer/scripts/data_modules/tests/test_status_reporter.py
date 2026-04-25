@@ -233,3 +233,104 @@ def test_relationship_graph_prefers_index_db_data():
         assert "mermaid" in graph
         assert "药老" in graph
         assert "师徒" in graph
+
+
+def test_scan_chapters_uses_external_registry_for_custom_output_path():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 3, "total_words": 2400},
+            "chapter_meta": {},
+        }
+        _write_state(project_root, state)
+
+        custom_path = project_root / "导出" / "终稿.md"
+        custom_path.parent.mkdir(parents=True, exist_ok=True)
+        custom_path.write_text("# 第三章\n项目内自定义输出。\n", encoding="utf-8")
+
+        (project_root / ".webnovel" / "external_chapters.json").write_text(
+            json.dumps({"0003": str(custom_path.resolve())}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+        reporter.scan_chapters()
+
+        assert len(reporter.chapters_data) == 1
+        chapter = reporter.chapters_data[0]
+        assert chapter["chapter"] == 3
+        assert chapter["word_count"] > 0
+
+
+def test_scan_chapters_prefers_external_registry_over_standard_path():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 3, "total_words": 2400},
+            "chapter_meta": {},
+        }
+        _write_state(project_root, state)
+
+        standard_path = project_root / "正文" / "第0003章.md"
+        standard_path.parent.mkdir(parents=True, exist_ok=True)
+        standard_path.write_text("# 第三章\n旧稿。\n", encoding="utf-8")
+
+        custom_path = project_root / "导出" / "终稿.md"
+        custom_path.parent.mkdir(parents=True, exist_ok=True)
+        custom_path.write_text("# 第三章\n终稿正文更长一些。\n", encoding="utf-8")
+
+        (project_root / ".webnovel" / "external_chapters.json").write_text(
+            json.dumps({"0003": str(custom_path.resolve())}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+        reporter.scan_chapters()
+
+        assert len(reporter.chapters_data) == 1
+        chapter = reporter.chapters_data[0]
+        assert chapter["chapter"] == 3
+        assert chapter["word_count"] == len("终稿正文更长一些。")
+
+
+def test_scan_chapters_supports_relative_registry_path():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = DataModulesConfig.from_project_root(tmpdir)
+        config.ensure_dirs()
+        project_root = config.project_root
+
+        state = {
+            "progress": {"current_chapter": 3, "total_words": 2400},
+            "chapter_meta": {},
+        }
+        _write_state(project_root, state)
+
+        standard_path = project_root / "正文" / "第0003章.md"
+        standard_path.parent.mkdir(parents=True, exist_ok=True)
+        standard_path.write_text("# 第三章\n旧稿。\n", encoding="utf-8")
+
+        custom_path = project_root / "导出" / "终稿.md"
+        custom_path.parent.mkdir(parents=True, exist_ok=True)
+        custom_path.write_text("# 第三章\n终稿正文更长一些。\n", encoding="utf-8")
+
+        (project_root / ".webnovel" / "external_chapters.json").write_text(
+            json.dumps({"0003": "导出/终稿.md"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        reporter = StatusReporter(str(project_root))
+        assert reporter.load_state() is True
+        reporter.scan_chapters()
+
+        assert len(reporter.chapters_data) == 1
+        chapter = reporter.chapters_data[0]
+        assert chapter["chapter"] == 3
+        assert chapter["word_count"] == len("终稿正文更长一些。")

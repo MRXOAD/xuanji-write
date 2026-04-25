@@ -35,13 +35,11 @@ v5.1 变更:
 import sqlite3
 import json
 import time
-from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from contextlib import contextmanager
-from datetime import datetime
 
 from .config import get_config
 from .index_chapter_mixin import IndexChapterMixin
@@ -167,9 +165,7 @@ class DebtEventMeta:
     """债务事件日志 (v5.3 引入)"""
 
     debt_id: int
-    event_type: (
-        str  # created / interest_accrued / partial_payment / full_payment / overdue
-    )
+    event_type: str  # created / interest_accrued / partial_payment / full_payment / overdue
     amount: float
     chapter: int
     note: str = ""
@@ -280,15 +276,9 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             """)
 
             # 创建索引
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_scenes_chapter ON scenes(chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_appearances_entity ON appearances(entity_id)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_appearances_chapter ON appearances(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_scenes_chapter ON scenes(chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_appearances_entity ON appearances(entity_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_appearances_chapter ON appearances(chapter)")
 
             # ==================== v5.1 引入表 ====================
 
@@ -350,36 +340,16 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             """)
 
             # v5.1 引入索引
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_tier ON entities(tier)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_entities_protagonist ON entities(is_protagonist)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_aliases_entity ON aliases(entity_id)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_aliases_alias ON aliases(alias)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_state_changes_entity ON state_changes(entity_id)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_state_changes_chapter ON state_changes(chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_entity)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_entity)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relationships_chapter ON relationships(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_entities_tier ON entities(tier)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_entities_protagonist ON entities(is_protagonist)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_aliases_entity ON aliases(entity_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_aliases_alias ON aliases(alias)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_state_changes_entity ON state_changes(entity_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_state_changes_chapter ON state_changes(chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_entity)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_entity)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationships_chapter ON relationships(chapter)")
 
             # 关系事件表 (v5.5 引入，用于时序回放/图谱分析)
             cursor.execute("""
@@ -405,9 +375,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_relationship_events_to_chapter ON relationship_events(to_entity, chapter)"
             )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_relationship_events_chapter ON relationship_events(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationship_events_chapter ON relationship_events(chapter)")
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_relationship_events_type_chapter ON relationship_events(type, chapter)"
             )
@@ -483,30 +451,14 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             """)
 
             # v5.3 引入索引
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_override_contracts_chapter ON override_contracts(chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_override_contracts_status ON override_contracts(status)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_override_contracts_due ON override_contracts(due_chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_chase_debt_status ON chase_debt(status)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_chase_debt_source ON chase_debt(source_chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_chase_debt_due ON chase_debt(due_chapter)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_debt_events_debt ON debt_events(debt_id)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_debt_events_chapter ON debt_events(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_override_contracts_chapter ON override_contracts(chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_override_contracts_status ON override_contracts(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_override_contracts_due ON override_contracts(due_chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chase_debt_status ON chase_debt(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chase_debt_source ON chase_debt(source_chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chase_debt_due ON chase_debt(due_chapter)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_events_debt ON debt_events(debt_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_events_chapter ON debt_events(chapter)")
 
             # ==================== v5.4 新增表：无效事实与日志 ====================
 
@@ -525,12 +477,8 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                 )
             """)
 
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_invalid_status ON invalid_facts(status)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_invalid_source ON invalid_facts(source_type, source_id)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_invalid_status ON invalid_facts(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_invalid_source ON invalid_facts(source_type, source_id)")
 
             # 审查指标表
             cursor.execute("""
@@ -548,9 +496,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     PRIMARY KEY (start_chapter, end_chapter)
                 )
             """)
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_review_metrics_end ON review_metrics(end_chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_review_metrics_end ON review_metrics(end_chapter)")
 
             # RAG 查询日志
             cursor.execute("""
@@ -565,12 +511,8 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_rag_query_type ON rag_query_log(query_type)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_rag_query_chapter ON rag_query_log(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rag_query_type ON rag_query_log(query_type)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rag_query_chapter ON rag_query_log(chapter)")
 
             # 工具调用统计
             cursor.execute("""
@@ -585,12 +527,8 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_tool_stats_name ON tool_call_stats(tool_name)"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_tool_stats_chapter ON tool_call_stats(chapter)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_tool_stats_name ON tool_call_stats(tool_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_tool_stats_chapter ON tool_call_stats(chapter)")
 
             # 写作清单评分记录（Phase F）
             cursor.execute("""
@@ -613,9 +551,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_checklist_score_value ON writing_checklist_scores(score)"
-            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_checklist_score_value ON writing_checklist_scores(score)")
 
             conn.commit()
 
@@ -630,6 +566,7 @@ class IndexManager(IndexChapterMixin, IndexEntityMixin, IndexDebtMixin, IndexRea
             conn.close()
 
     # ==================== 章节操作 ====================
+
 
 # ==================== CLI 接口 ====================
 
@@ -689,9 +626,7 @@ def main():
 
     # 按类型获取实体
     type_parser = subparsers.add_parser("get-entities-by-type")
-    type_parser.add_argument(
-        "--type", required=True, help="实体类型 (角色/地点/物品/势力/招式)"
-    )
+    type_parser.add_argument("--type", required=True, help="实体类型 (角色/地点/物品/势力/招式)")
     type_parser.add_argument("--include-archived", action="store_true")
 
     # 按别名查找实体
@@ -711,9 +646,7 @@ def main():
     # 获取实体关系
     rel_parser = subparsers.add_parser("get-relationships")
     rel_parser.add_argument("--entity", required=True)
-    rel_parser.add_argument(
-        "--direction", choices=["from", "to", "both"], default="both"
-    )
+    rel_parser.add_argument("--direction", choices=["from", "to", "both"], default="both")
 
     # 获取关系事件
     rel_events_parser = subparsers.add_parser("get-relationship-events")
@@ -750,9 +683,7 @@ def main():
 
     # 写入实体
     upsert_entity_parser = subparsers.add_parser("upsert-entity")
-    upsert_entity_parser.add_argument(
-        "--data", required=True, help="JSON 格式的实体数据"
-    )
+    upsert_entity_parser.add_argument("--data", required=True, help="JSON 格式的实体数据")
 
     # 写入关系
     upsert_rel_parser = subparsers.add_parser("upsert-relationship")
@@ -760,9 +691,7 @@ def main():
 
     # 写入状态变化
     state_change_parser = subparsers.add_parser("record-state-change")
-    state_change_parser.add_argument(
-        "--data", required=True, help="JSON 格式的状态变化数据"
-    )
+    state_change_parser.add_argument("--data", required=True, help="JSON 格式的状态变化数据")
 
     # ==================== v5.4 新增命令 ====================
     invalid_parser = subparsers.add_parser("mark-invalid")
@@ -848,9 +777,7 @@ def main():
 
     # 创建Override Contract
     create_override_parser = subparsers.add_parser("create-override-contract")
-    create_override_parser.add_argument(
-        "--data", required=True, help="JSON 格式的Override Contract数据"
-    )
+    create_override_parser.add_argument("--data", required=True, help="JSON 格式的Override Contract数据")
 
     # 创建债务
     create_debt_parser = subparsers.add_parser("create-debt")
@@ -862,9 +789,7 @@ def main():
 
     # 保存章节追读力元数据
     save_rp_parser = subparsers.add_parser("save-chapter-reading-power")
-    save_rp_parser.add_argument(
-        "--data", required=True, help="JSON 格式的章节追读力元数据"
-    )
+    save_rp_parser.add_argument("--data", required=True, help="JSON 格式的章节追读力元数据")
 
     argv = normalize_global_project_root(sys.argv[1:])
     args = parser.parse_args(argv)
@@ -874,10 +799,10 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     manager = IndexManager(config)
@@ -1109,7 +1034,9 @@ def main():
             chapter=data["chapter"],
         )
         record_id = manager.record_state_change(change)
-        emit_success({"id": record_id, "entity": change.entity_id, "field": change.field}, message="state_change_recorded")
+        emit_success(
+            {"id": record_id, "entity": change.entity_id, "field": change.field}, message="state_change_recorded"
+        )
 
     # ==================== v5.4 无效事实命令处理 ====================
 
@@ -1308,6 +1235,7 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()

@@ -28,19 +28,16 @@ migrate_state_to_sqlite.py - 数据迁移脚本 (v5.4)
 
 import json
 import shutil
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Dict
 
-from .config import get_config, DataModulesConfig
+from .config import DataModulesConfig
 from .sql_state_manager import SQLStateManager, EntityData
 
 
 def migrate_state_to_sqlite(
-    config: DataModulesConfig,
-    dry_run: bool = False,
-    backup: bool = True,
-    verbose: bool = True
+    config: DataModulesConfig, dry_run: bool = False, backup: bool = True, verbose: bool = True
 ) -> Dict[str, int]:
     """
     执行迁移
@@ -53,14 +50,7 @@ def migrate_state_to_sqlite(
 
     返回: 迁移统计
     """
-    stats = {
-        "entities": 0,
-        "aliases": 0,
-        "state_changes": 0,
-        "relationships": 0,
-        "skipped": 0,
-        "errors": 0
-    }
+    stats = {"entities": 0, "aliases": 0, "state_changes": 0, "relationships": 0, "skipped": 0, "errors": 0}
 
     # 读取 state.json
     state_file = config.state_file
@@ -69,7 +59,7 @@ def migrate_state_to_sqlite(
             print(f"❌ state.json 不存在: {state_file}")
         return stats
 
-    with open(state_file, 'r', encoding='utf-8') as f:
+    with open(state_file, "r", encoding="utf-8") as f:
         state = json.load(f)
 
     if verbose:
@@ -89,7 +79,7 @@ def migrate_state_to_sqlite(
     # 1. 迁移 entities_v3
     entities_v3 = state.get("entities_v3", {})
     if verbose:
-        print(f"\n🔄 迁移 entities_v3...")
+        print("\n🔄 迁移 entities_v3...")
 
     for entity_type, entities in entities_v3.items():
         if not isinstance(entities, dict):
@@ -111,7 +101,7 @@ def migrate_state_to_sqlite(
                     aliases=[],  # 别名单独处理
                     first_appearance=entity_data.get("first_appearance", 0),
                     last_appearance=entity_data.get("last_appearance", 0),
-                    is_protagonist=entity_data.get("is_protagonist", False)
+                    is_protagonist=entity_data.get("is_protagonist", False),
                 )
 
                 if not dry_run:
@@ -132,7 +122,7 @@ def migrate_state_to_sqlite(
     # 2. 迁移 alias_index
     alias_index = state.get("alias_index", {})
     if verbose:
-        print(f"\n🔄 迁移 alias_index...")
+        print("\n🔄 迁移 alias_index...")
 
     for alias, entries in alias_index.items():
         if not isinstance(entries, list):
@@ -165,7 +155,7 @@ def migrate_state_to_sqlite(
     # 3. 迁移 state_changes
     state_changes = state.get("state_changes", [])
     if verbose:
-        print(f"\n🔄 迁移 state_changes...")
+        print("\n🔄 迁移 state_changes...")
 
     for change in state_changes:
         if not isinstance(change, dict):
@@ -185,7 +175,7 @@ def migrate_state_to_sqlite(
                     old_value=change.get("old", change.get("old_value", "")),
                     new_value=change.get("new", change.get("new_value", "")),
                     reason=change.get("reason", ""),
-                    chapter=change.get("chapter", 0)
+                    chapter=change.get("chapter", 0),
                 )
             stats["state_changes"] += 1
 
@@ -200,7 +190,7 @@ def migrate_state_to_sqlite(
     # 4. 迁移 structured_relationships
     relationships = state.get("structured_relationships", [])
     if verbose:
-        print(f"\n🔄 迁移 structured_relationships...")
+        print("\n🔄 迁移 structured_relationships...")
 
     for rel in relationships:
         if not isinstance(rel, dict):
@@ -220,7 +210,7 @@ def migrate_state_to_sqlite(
                     to_entity=to_entity,
                     type=rel.get("type", "相识"),
                     description=rel.get("description", ""),
-                    chapter=rel.get("chapter", 0)
+                    chapter=rel.get("chapter", 0),
                 )
             stats["relationships"] += 1
 
@@ -235,7 +225,7 @@ def migrate_state_to_sqlite(
     # 5. 精简 state.json（移除已迁移字段）
     if not dry_run:
         if verbose:
-            print(f"\n🔄 精简 state.json...")
+            print("\n🔄 精简 state.json...")
 
         # 保留字段
         slim_state = {
@@ -251,10 +241,10 @@ def migrate_state_to_sqlite(
             "disambiguation_pending": state.get("disambiguation_pending", [])[-10:],
             # v5.1 引入标记
             "_migrated_to_sqlite": True,
-            "_migration_timestamp": datetime.now().isoformat()
+            "_migration_timestamp": datetime.now().isoformat(),
         }
 
-        with open(state_file, 'w', encoding='utf-8') as f:
+        with open(state_file, "w", encoding="utf-8") as f:
             json.dump(slim_state, f, ensure_ascii=False, indent=2)
 
         new_size = state_file.stat().st_size / 1024
@@ -263,8 +253,8 @@ def migrate_state_to_sqlite(
 
     # 打印统计
     if verbose:
-        print(f"\n" + "=" * 50)
-        print(f"📊 迁移统计:")
+        print("\n" + "=" * 50)
+        print("📊 迁移统计:")
         print(f"  实体: {stats['entities']}")
         print(f"  别名: {stats['aliases']}")
         print(f"  状态变化: {stats['state_changes']}")
@@ -272,7 +262,7 @@ def migrate_state_to_sqlite(
         print(f"  跳过: {stats['skipped']}")
         print(f"  错误: {stats['errors']}")
         if dry_run:
-            print(f"\n⚠️ 这是 dry-run 模式，实际未写入任何数据")
+            print("\n⚠️ 这是 dry-run 模式，实际未写入任何数据")
 
     return stats
 
@@ -296,8 +286,7 @@ def _slim_world_settings(world_settings: Dict) -> Dict:
     factions = world_settings.get("factions", [])
     if isinstance(factions, list):
         slim["factions"] = [
-            {"name": f.get("name"), "type": f.get("type")}
-            if isinstance(f, dict) else f
+            {"name": f.get("name"), "type": f.get("type")} if isinstance(f, dict) else f
             for f in factions[:30]  # 最多30个势力
         ]
 
@@ -339,7 +328,10 @@ def main():
     # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
     from project_locator import resolve_project_root
 
-    resolved_root = resolve_project_root(args.project_root)
+    try:
+        resolved_root = resolve_project_root(args.project_root)
+    except FileNotFoundError:
+        resolved_root = Path(args.project_root).expanduser().resolve()
     config = DataModulesConfig.from_project_root(resolved_root)
     backup = not args.no_backup
     logger = IndexManager(config)

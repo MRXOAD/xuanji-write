@@ -3,6 +3,7 @@
 """
 ContextManager - assemble context packs with weighted priorities.
 """
+
 from __future__ import annotations
 
 import json
@@ -350,18 +351,14 @@ class ContextManager:
             return {}
 
         limit = max(1, int(getattr(self.config, "context_writing_guidance_max_items", 6)))
-        low_score_threshold = float(
-            getattr(self.config, "context_writing_guidance_low_score_threshold", 75.0)
-        )
+        low_score_threshold = float(getattr(self.config, "context_writing_guidance_low_score_threshold", 75.0))
 
         guidance_bundle = build_guidance_items(
             chapter=chapter,
             reader_signal=reader_signal,
             genre_profile=genre_profile,
             low_score_threshold=low_score_threshold,
-            hook_diversify_enabled=bool(
-                getattr(self.config, "context_writing_guidance_hook_diversify", True)
-            ),
+            hook_diversify_enabled=bool(getattr(self.config, "context_writing_guidance_hook_diversify", True)),
         )
 
         guidance = list(guidance_bundle.get("guidance") or [])
@@ -400,9 +397,7 @@ class ContextManager:
 
         hook_types = list(hook_usage.keys())[:3] if isinstance(hook_usage, dict) else []
         top_patterns = (
-            sorted(pattern_usage, key=pattern_usage.get, reverse=True)[:3]
-            if isinstance(pattern_usage, dict)
-            else []
+            sorted(pattern_usage, key=pattern_usage.get, reverse=True)[:3] if isinstance(pattern_usage, dict) else []
         )
 
         return {
@@ -740,10 +735,10 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     manager = ContextManager(config)
@@ -764,7 +759,11 @@ def main():
         print_error("CONTEXT_BUILD_FAILED", str(exc), suggestion="请检查项目结构与依赖文件")
         try:
             manager.index_manager.log_tool_call(
-                "context_manager:build", False, error_code="CONTEXT_BUILD_FAILED", error_message=str(exc), chapter=args.chapter
+                "context_manager:build",
+                False,
+                error_code="CONTEXT_BUILD_FAILED",
+                error_message=str(exc),
+                chapter=args.chapter,
             )
         except Exception as log_exc:
             logger.warning("failed to log failed tool call: %s", log_exc)
@@ -772,6 +771,7 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()

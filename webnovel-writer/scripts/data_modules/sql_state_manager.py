@@ -12,10 +12,8 @@ SQL State Manager - SQLite 状态管理模块 (v5.4)
 - 支持增量写入和按需查询
 """
 
-import json
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime
 
 from .index_manager import (
     IndexManager,
@@ -31,6 +29,7 @@ from .observability import safe_log_tool_call
 @dataclass
 class EntityData:
     """实体数据（用于 Data Agent 输入）"""
+
     id: str
     type: str  # 角色/地点/物品/势力/招式
     name: str
@@ -122,7 +121,7 @@ class SQLStateManager:
             first_appearance=entity.first_appearance,
             last_appearance=entity.last_appearance,
             is_protagonist=entity.is_protagonist,
-            is_archived=False
+            is_archived=False,
         )
 
         is_new = self._index_manager.upsert_entity(meta)
@@ -191,13 +190,7 @@ class SQLStateManager:
     # ==================== 状态变化操作 ====================
 
     def record_state_change(
-        self,
-        entity_id: str,
-        field: str,
-        old_value: Any,
-        new_value: Any,
-        reason: str,
-        chapter: int
+        self, entity_id: str, field: str, old_value: Any, new_value: Any, reason: str, chapter: int
     ) -> int:
         """
         记录状态变化
@@ -210,7 +203,7 @@ class SQLStateManager:
             old_value=str(old_value) if old_value is not None else "",
             new_value=str(new_value),
             reason=reason,
-            chapter=chapter
+            chapter=chapter,
         )
         return self._index_manager.record_state_change(change)
 
@@ -228,25 +221,14 @@ class SQLStateManager:
 
     # ==================== 关系操作 ====================
 
-    def upsert_relationship(
-        self,
-        from_entity: str,
-        to_entity: str,
-        type: str,
-        description: str,
-        chapter: int
-    ) -> bool:
+    def upsert_relationship(self, from_entity: str, to_entity: str, type: str, description: str, chapter: int) -> bool:
         """
         插入或更新关系
 
         返回: 是否为新关系
         """
         rel = RelationshipMeta(
-            from_entity=from_entity,
-            to_entity=to_entity,
-            type=type,
-            description=description,
-            chapter=chapter
+            from_entity=from_entity, to_entity=to_entity, type=type, description=description, chapter=chapter
         )
         return self._index_manager.upsert_relationship(rel)
 
@@ -270,7 +252,7 @@ class SQLStateManager:
         entities_appeared: List[Dict],
         entities_new: List[Dict],
         state_changes: List[Dict],
-        relationships_new: List[Dict]
+        relationships_new: List[Dict],
     ) -> Dict[str, int]:
         """
         处理章节的实体数据（Data Agent 主入口）
@@ -288,13 +270,7 @@ class SQLStateManager:
 
         返回: 写入统计
         """
-        stats = {
-            "entities_updated": 0,
-            "entities_created": 0,
-            "state_changes": 0,
-            "relationships": 0,
-            "aliases": 0
-        }
+        stats = {"entities_updated": 0, "entities_created": 0, "state_changes": 0, "relationships": 0, "aliases": 0}
 
         # 1. 处理出场实体（更新 last_appearance）
         for entity in entities_appeared:
@@ -315,7 +291,7 @@ class SQLStateManager:
                 entity_id=entity_id,
                 chapter=chapter,
                 mentions=entity.get("mentions", []),
-                confidence=entity.get("confidence", 1.0)
+                confidence=entity.get("confidence", 1.0),
             )
 
         # 2. 处理新实体
@@ -334,7 +310,7 @@ class SQLStateManager:
                 aliases=entity.get("aliases", []),
                 first_appearance=chapter,
                 last_appearance=chapter,
-                is_protagonist=entity.get("is_protagonist", False)
+                is_protagonist=entity.get("is_protagonist", False),
             )
             is_new = self.upsert_entity(entity_data)
             if is_new:
@@ -350,10 +326,7 @@ class SQLStateManager:
             if not mentions:
                 mentions = [entity_data.name]  # 至少包含实体名
             self._index_manager.record_appearance(
-                entity_id=suggested_id,
-                chapter=chapter,
-                mentions=mentions,
-                confidence=entity.get("confidence", 1.0)
+                entity_id=suggested_id, chapter=chapter, mentions=mentions, confidence=entity.get("confidence", 1.0)
             )
 
         # 3. 处理状态变化
@@ -368,7 +341,7 @@ class SQLStateManager:
                 old_value=change.get("old", change.get("old_value", "")),
                 new_value=change.get("new", change.get("new_value", "")),
                 reason=change.get("reason", ""),
-                chapter=chapter
+                chapter=chapter,
             )
             stats["state_changes"] += 1
 
@@ -406,11 +379,7 @@ class SQLStateManager:
             )
 
             self.upsert_relationship(
-                from_entity=from_entity,
-                to_entity=to_entity,
-                type=rel_type,
-                description=description,
-                chapter=chapter
+                from_entity=from_entity, to_entity=to_entity, type=rel_type, description=description, chapter=chapter
             )
             stats["relationships"] += 1
 
@@ -420,12 +389,15 @@ class SQLStateManager:
         """更新实体的 last_appearance"""
         with self._index_manager._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE entities SET
                     last_appearance = MAX(last_appearance, ?),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (chapter, entity_id))
+            """,
+                (chapter, entity_id),
+            )
             conn.commit()
 
     # ==================== 统计 ====================
@@ -456,7 +428,7 @@ class SQLStateManager:
                     "current": e.get("current_json", {}),
                     "history": [],  # 历史记录需要从 state_changes 表查询
                     "first_appearance": e.get("first_appearance", 0),
-                    "last_appearance": e.get("last_appearance", 0)
+                    "last_appearance": e.get("last_appearance", 0),
                 }
                 if e.get("is_protagonist"):
                     entity_dict["is_protagonist"] = True
@@ -479,15 +451,13 @@ class SQLStateManager:
                 alias = row["alias"]
                 if alias not in result:
                     result[alias] = []
-                result[alias].append({
-                    "type": row["entity_type"],
-                    "id": row["entity_id"]
-                })
+                result[alias].append({"type": row["entity_type"], "id": row["entity_id"]})
 
         return result
 
 
 # ==================== CLI 接口 ====================
+
 
 def main():
     import argparse
@@ -528,10 +498,10 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     manager = SQLStateManager(config)

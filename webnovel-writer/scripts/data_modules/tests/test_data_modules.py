@@ -5,11 +5,9 @@ Data Modules 单元测试
 """
 
 import pytest
-import asyncio
 import json
 import tempfile
 import sys
-from pathlib import Path
 
 from data_modules import (
     DataModulesConfig,
@@ -150,10 +148,7 @@ class TestEntityLinker:
         linker = EntityLinker(temp_project)
 
         result = linker.process_uncertain(
-            mention="那位前辈",
-            candidates=["yaolao", "elder_zhang"],
-            suggested="yaolao",
-            confidence=0.7
+            mention="那位前辈", candidates=["yaolao", "elder_zhang"], suggested="yaolao", confidence=0.7
         )
 
         assert result.mention == "那位前辈"
@@ -168,12 +163,7 @@ class TestStateManager:
     def test_add_and_get_entity(self, temp_project):
         manager = StateManager(temp_project)
 
-        entity = EntityState(
-            id="xiaoyan",
-            name="萧炎",
-            type="角色",
-            tier="核心"
-        )
+        entity = EntityState(id="xiaoyan", name="萧炎", type="角色", tier="核心")
         assert manager.add_entity(entity)
 
         # 获取实体
@@ -200,12 +190,7 @@ class TestStateManager:
         manager.add_entity(entity)
 
         manager.record_state_change(
-            entity_id="xiaoyan",
-            field="realm",
-            old_value="斗者",
-            new_value="斗师",
-            reason="突破",
-            chapter=100
+            entity_id="xiaoyan", field="realm", old_value="斗者", new_value="斗师", reason="突破", chapter=100
         )
 
         changes = manager.get_state_changes("xiaoyan")
@@ -216,11 +201,7 @@ class TestStateManager:
         manager = StateManager(temp_project)
 
         manager.add_relationship(
-            from_entity="xiaoyan",
-            to_entity="yaolao",
-            rel_type="师徒",
-            description="药老收萧炎为徒",
-            chapter=10
+            from_entity="xiaoyan", to_entity="yaolao", rel_type="师徒", description="药老收萧炎为徒", chapter=10
         )
 
         rels = manager.get_relationships("xiaoyan")
@@ -231,18 +212,12 @@ class TestStateManager:
         manager = StateManager(temp_project)
 
         result = {
-            "entities_appeared": [
-                {"id": "xiaoyan", "mentions": ["萧炎", "他"]}
-            ],
-            "entities_new": [
-                {"suggested_id": "hongyi_girl", "name": "红衣女子", "type": "角色", "tier": "装饰"}
-            ],
+            "entities_appeared": [{"id": "xiaoyan", "mentions": ["萧炎", "他"]}],
+            "entities_new": [{"suggested_id": "hongyi_girl", "name": "红衣女子", "type": "角色", "tier": "装饰"}],
             "state_changes": [
                 {"entity_id": "xiaoyan", "field": "realm", "old": "斗者", "new": "斗师", "reason": "突破"}
             ],
-            "relationships_new": [
-                {"from": "xiaoyan", "to": "hongyi_girl", "type": "相识", "description": "初次见面"}
-            ]
+            "relationships_new": [{"from": "xiaoyan", "to": "hongyi_girl", "type": "相识", "description": "初次见面"}],
         }
 
         # 先添加萧炎
@@ -367,11 +342,7 @@ class TestIndexManager:
         manager = IndexManager(temp_project)
 
         meta = ChapterMeta(
-            chapter=100,
-            title="突破",
-            location="天云宗",
-            word_count=3500,
-            characters=["xiaoyan", "yaolao"]
+            chapter=100, title="突破", location="天云宗", word_count=3500, characters=["xiaoyan", "yaolao"]
         )
         manager.add_chapter(meta)
 
@@ -384,10 +355,24 @@ class TestIndexManager:
         manager = IndexManager(temp_project)
 
         scenes = [
-            SceneMeta(chapter=100, scene_index=1, start_line=1, end_line=50,
-                     location="天云宗·闭关室", summary="萧炎闭关突破", characters=["xiaoyan"]),
-            SceneMeta(chapter=100, scene_index=2, start_line=51, end_line=100,
-                     location="天云宗·演武场", summary="展示实力", characters=["xiaoyan", "lintian"])
+            SceneMeta(
+                chapter=100,
+                scene_index=1,
+                start_line=1,
+                end_line=50,
+                location="天云宗·闭关室",
+                summary="萧炎闭关突破",
+                characters=["xiaoyan"],
+            ),
+            SceneMeta(
+                chapter=100,
+                scene_index=2,
+                start_line=51,
+                end_line=100,
+                location="天云宗·演武场",
+                summary="展示实力",
+                characters=["xiaoyan", "lintian"],
+            ),
         ]
         manager.add_scenes(100, scenes)
 
@@ -411,10 +396,24 @@ class TestIndexManager:
         manager = IndexManager(temp_project)
 
         scenes = [
-            SceneMeta(chapter=100, scene_index=1, start_line=1, end_line=50,
-                     location="天云宗·闭关室", summary="闭关", characters=[]),
-            SceneMeta(chapter=101, scene_index=1, start_line=1, end_line=50,
-                     location="天云宗·大殿", summary="议事", characters=[])
+            SceneMeta(
+                chapter=100,
+                scene_index=1,
+                start_line=1,
+                end_line=50,
+                location="天云宗·闭关室",
+                summary="闭关",
+                characters=[],
+            ),
+            SceneMeta(
+                chapter=101,
+                scene_index=1,
+                start_line=1,
+                end_line=50,
+                location="天云宗·大殿",
+                summary="议事",
+                characters=[],
+            ),
         ]
         manager.add_scenes(100, scenes[:1])
         manager.add_scenes(101, scenes[1:])
@@ -436,8 +435,9 @@ class TestIndexManager:
             )
         )
         manager.add_chapter(ChapterMeta(chapter=1, title="", location="", word_count=1000, characters=[]))
-        manager.add_scenes(1, [SceneMeta(chapter=1, scene_index=1, start_line=1, end_line=50,
-                                        location="", summary="", characters=[])])
+        manager.add_scenes(
+            1, [SceneMeta(chapter=1, scene_index=1, start_line=1, end_line=50, location="", summary="", characters=[])]
+        )
         manager.record_appearance("xiaoyan", 1, [], 1.0)
 
         stats = manager.get_stats()
@@ -498,10 +498,7 @@ class TestIndexManager:
         # 归档实体
         assert manager.archive_entity("yaolao") is True
         assert all(e["id"] != "yaolao" for e in manager.get_entities_by_type("角色"))
-        assert any(
-            e["id"] == "yaolao"
-            for e in manager.get_entities_by_type("角色", include_archived=True)
-        )
+        assert any(e["id"] == "yaolao" for e in manager.get_entities_by_type("角色", include_archived=True))
 
         # 关系管理（新建 + 更新）
         rel = RelationshipMeta(
@@ -616,7 +613,16 @@ class TestIndexManager:
             location="秘境",
             word_count=1500,
             entities=[{"id": "xiaoyan", "type": "角色", "mentions": ["萧炎"]}],
-            scenes=[{"index": 1, "start_line": 1, "end_line": 20, "location": "秘境", "summary": "开场", "characters": ["xiaoyan"]}],
+            scenes=[
+                {
+                    "index": 1,
+                    "start_line": 1,
+                    "end_line": 20,
+                    "location": "秘境",
+                    "summary": "开场",
+                    "characters": ["xiaoyan"],
+                }
+            ],
         )
         assert stats["chapters"] == 1
         assert stats["scenes"] == 1
@@ -1108,9 +1114,7 @@ class TestIndexManager:
         run_cli(["--project-root", root, "get-entity", "--id", "missing"])
         run_cli(["--project-root", root, "get-core-entities"])
         run_cli(["--project-root", root, "get-protagonist"])
-        run_cli(
-            ["--project-root", root, "get-entities-by-type", "--type", "角色", "--include-archived"]
-        )
+        run_cli(["--project-root", root, "get-entities-by-type", "--type", "角色", "--include-archived"])
         run_cli(["--project-root", root, "get-by-alias", "--alias", "炎帝"])
         run_cli(["--project-root", root, "get-by-alias", "--alias", "不存在"])
         run_cli(["--project-root", root, "get-aliases", "--entity", "xiaoyan"])
@@ -1319,12 +1323,7 @@ class TestStyleSampler:
         sampler = StyleSampler(temp_project)
 
         sample = StyleSample(
-            id="ch100_s1",
-            chapter=100,
-            scene_type="战斗",
-            content="萧炎一拳轰出...",
-            score=0.85,
-            tags=["战斗", "激烈"]
+            id="ch100_s1", chapter=100, scene_type="战斗", content="萧炎一拳轰出...", score=0.85, tags=["战斗", "激烈"]
         )
         assert sampler.add_sample(sample)
 
@@ -1336,7 +1335,11 @@ class TestStyleSampler:
         sampler = StyleSampler(temp_project)
 
         scenes = [
-            {"index": 1, "summary": "战斗场景", "content": "萧炎一拳轰出，斗气如虹，直接将对手击退三丈，周围的空气都被震得嗡嗡作响..." + "a" * 200}
+            {
+                "index": 1,
+                "summary": "战斗场景",
+                "content": "萧炎一拳轰出，斗气如虹，直接将对手击退三丈，周围的空气都被震得嗡嗡作响..." + "a" * 200,
+            }
         ]
 
         # 低分不提取
@@ -1353,14 +1356,9 @@ class TestStyleSampler:
 
         # 添加一些样本
         for i in range(3):
-            sampler.add_sample(StyleSample(
-                id=f"battle_{i}",
-                chapter=i,
-                scene_type="战斗",
-                content=f"战斗内容 {i}",
-                score=0.9,
-                tags=[]
-            ))
+            sampler.add_sample(
+                StyleSample(id=f"battle_{i}", chapter=i, scene_type="战斗", content=f"战斗内容 {i}", score=0.9, tags=[])
+            )
 
         samples = sampler.select_samples_for_chapter("本章有一场激烈的战斗")
         assert len(samples) <= 3
@@ -1378,15 +1376,21 @@ class TestRAGAdapter:
             cursor = conn.cursor()
 
             # 插入向量记录（空向量，只测试 BM25）
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO vectors (chunk_id, chapter, scene_index, content, embedding)
                 VALUES (?, ?, ?, ?, ?)
-            """, ("ch1_s1", 1, 1, "萧炎在天云宗修炼斗气", b""))
+            """,
+                ("ch1_s1", 1, 1, "萧炎在天云宗修炼斗气", b""),
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO vectors (chunk_id, chapter, scene_index, content, embedding)
                 VALUES (?, ?, ?, ?, ?)
-            """, ("ch1_s2", 1, 2, "药老传授炼药技巧", b""))
+            """,
+                ("ch1_s2", 1, 2, "药老传授炼药技巧", b""),
+            )
 
             conn.commit()
 

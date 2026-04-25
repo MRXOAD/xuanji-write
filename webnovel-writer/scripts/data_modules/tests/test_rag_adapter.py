@@ -6,7 +6,6 @@ RAGAdapter tests
 
 import sys
 import json
-import asyncio
 import logging
 import sqlite3
 from contextlib import closing
@@ -103,9 +102,7 @@ async def test_store_chunks_with_embedding_failure(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_hybrid_search_full_scan(temp_project):
     adapter = RAGAdapter(temp_project)
-    await adapter.store_chunks(
-        [{"chapter": 1, "scene_index": 1, "content": "萧炎修炼"}]
-    )
+    await adapter.store_chunks([{"chapter": 1, "scene_index": 1, "content": "萧炎修炼"}])
     results = await adapter.hybrid_search("萧炎", vector_top_k=5, bm25_top_k=5, rerank_top_n=1)
     assert results
     assert results[0].source == "hybrid"
@@ -237,9 +234,7 @@ async def test_search_auto_uses_graph_strategy_when_enabled(tmp_path, monkeypatc
         )
     )
     adapter.index_manager.register_alias("萧炎", "xiaoyan", "角色")
-    await adapter.store_chunks(
-        [{"chapter": 1, "scene_index": 1, "content": "萧炎突破斗师"}]
-    )
+    await adapter.store_chunks([{"chapter": 1, "scene_index": 1, "content": "萧炎突破斗师"}])
 
     results = await adapter.search("萧炎关系", top_k=1, strategy="auto")
     assert results
@@ -253,9 +248,7 @@ async def test_graph_hybrid_search_fallback_when_graph_disabled(tmp_path, monkey
     cfg.graph_rag_enabled = False
     monkeypatch.setattr(rag_module, "get_client", lambda config: StubClient())
     adapter = RAGAdapter(cfg)
-    await adapter.store_chunks(
-        [{"chapter": 1, "scene_index": 1, "content": "萧炎在天云宗修炼斗气"}]
-    )
+    await adapter.store_chunks([{"chapter": 1, "scene_index": 1, "content": "萧炎在天云宗修炼斗气"}])
 
     modes = []
 
@@ -335,9 +328,7 @@ async def test_search_unknown_strategy_falls_back_to_hybrid(tmp_path, monkeypatc
     cfg.ensure_dirs()
     monkeypatch.setattr(rag_module, "get_client", lambda config: StubClient())
     adapter = RAGAdapter(cfg)
-    await adapter.store_chunks(
-        [{"chapter": 1, "scene_index": 1, "content": "萧炎在天云宗修炼斗气"}]
-    )
+    await adapter.store_chunks([{"chapter": 1, "scene_index": 1, "content": "萧炎在天云宗修炼斗气"}])
 
     results = await adapter.search("萧炎", top_k=1, strategy="not_exists")
     assert results

@@ -4,7 +4,7 @@
 网文项目初始化脚本
 
 目标：
-- 生成可运行的项目结构（webnovel-project）
+- 生成可运行的项目结构
 - 创建/更新 .webnovel/state.json（运行时真相）
 - 生成基础设定集与大纲模板文件（供 /webnovel-plan 与 /webnovel-write 使用）
 
@@ -261,6 +261,7 @@ def init_project(
     sect_hierarchy: str = "",
     cultivation_chain: str = "",
     cultivation_subtiers: str = "",
+    git_init: bool = False,
 ) -> None:
     project_path = Path(project_dir).expanduser().resolve()
     if ".claude" in project_path.parts:
@@ -385,29 +386,32 @@ def init_project(
 
     worldview_content = output_worldview.strip() if output_worldview else ""
     if not worldview_content:
-        worldview_content = "\n".join(
-            [
-                "# 世界观",
-                "",
-                f"> 项目：{title}｜题材：{genre}｜创建：{now}",
-                "",
-                "## 一句话世界观",
-                "- （用一句话说明世界的核心规则与卖点）",
-                "",
-                "## 核心规则（设定即物理）",
-                "- 规则1：",
-                "- 规则2：",
-                "- 规则3：",
-                "",
-                "## 势力与地理（简版）",
-                "- 主要势力：",
-                "- 关键地点：",
-                "",
-                "## 参考题材模板（可删/可改）",
-                "",
-                (genre_template.strip() + "\n") if genre_template else "（未找到对应题材模板，可自行补充）\n",
-            ]
-        ).rstrip() + "\n"
+        worldview_content = (
+            "\n".join(
+                [
+                    "# 世界观",
+                    "",
+                    f"> 项目：{title}｜题材：{genre}｜创建：{now}",
+                    "",
+                    "## 一句话世界观",
+                    "- （用一句话说明世界的核心规则与卖点）",
+                    "",
+                    "## 核心规则（设定即物理）",
+                    "- 规则1：",
+                    "- 规则2：",
+                    "- 规则3：",
+                    "",
+                    "## 势力与地理（简版）",
+                    "- 主要势力：",
+                    "- 关键地点：",
+                    "",
+                    "## 参考题材模板（可删/可改）",
+                    "",
+                    (genre_template.strip() + "\n") if genre_template else "（未找到对应题材模板，可自行补充）\n",
+                ]
+            ).rstrip()
+            + "\n"
+        )
     else:
         worldview_content = _apply_label_replacements(
             worldview_content,
@@ -428,26 +432,29 @@ def init_project(
 
     power_content = output_power.strip() if output_power else ""
     if not power_content:
-        power_content = "\n".join(
-            [
-                "# 力量体系",
-                "",
-                f"> 项目：{title}｜题材：{genre}｜创建：{now}",
-                "",
-                "## 等级/境界划分",
-                "- （列出从弱到强的等级，含突破条件与代价）",
-                "",
-                "## 技能/招式规则",
-                "- 获得方式：",
-                "- 成本与副作用：",
-                "- 进阶与组合：",
-                "",
-                "## 禁止事项（防崩坏）",
-                "- 未达等级不得使用高阶能力（设定即物理）",
-                "- 新增能力必须申报并入库（发明需申报）",
-                "",
-            ]
-        ).rstrip() + "\n"
+        power_content = (
+            "\n".join(
+                [
+                    "# 力量体系",
+                    "",
+                    f"> 项目：{title}｜题材：{genre}｜创建：{now}",
+                    "",
+                    "## 等级/境界划分",
+                    "- （列出从弱到强的等级，含突破条件与代价）",
+                    "",
+                    "## 技能/招式规则",
+                    "- 获得方式：",
+                    "- 成本与副作用：",
+                    "- 进阶与组合：",
+                    "",
+                    "## 禁止事项（防崩坏）",
+                    "- 未达等级不得使用高阶能力（设定即物理）",
+                    "- 新增能力必须申报并入库（发明需申报）",
+                    "",
+                ]
+            ).rstrip()
+            + "\n"
+        )
     else:
         power_content = _apply_label_replacements(
             power_content,
@@ -464,30 +471,33 @@ def init_project(
 
     protagonist_content = output_protagonist.strip() if output_protagonist else ""
     if not protagonist_content:
-        protagonist_content = "\n".join(
-            [
-                "# 主角卡",
-                "",
-                f"> 主角：{protagonist_name or '（待填写）'}｜项目：{title}｜创建：{now}",
-                "",
-                "## 三要素",
-                f"- 欲望：{protagonist_desire or '（待填写）'}",
-                f"- 弱点：{protagonist_flaw or '（待填写）'}",
-                f"- 人设类型：{protagonist_archetype or '（待填写）'}",
-                "",
-                "## 初始状态（开局）",
-                "- 身份：",
-                "- 资源：",
-                "- 约束：",
-                "",
-                "## 金手指概览",
-                f"- 称呼：{golden_finger_name or '（待填写）'}",
-                f"- 类型：{golden_finger_type or '（待填写）'}",
-                f"- 风格：{golden_finger_style or '（待填写）'}",
-                "- 成长曲线：",
-                "",
-            ]
-        ).rstrip() + "\n"
+        protagonist_content = (
+            "\n".join(
+                [
+                    "# 主角卡",
+                    "",
+                    f"> 主角：{protagonist_name or '（待填写）'}｜项目：{title}｜创建：{now}",
+                    "",
+                    "## 三要素",
+                    f"- 欲望：{protagonist_desire or '（待填写）'}",
+                    f"- 弱点：{protagonist_flaw or '（待填写）'}",
+                    f"- 人设类型：{protagonist_archetype or '（待填写）'}",
+                    "",
+                    "## 初始状态（开局）",
+                    "- 身份：",
+                    "- 资源：",
+                    "- 约束：",
+                    "",
+                    "## 金手指概览",
+                    f"- 称呼：{golden_finger_name or '（待填写）'}",
+                    f"- 类型：{golden_finger_type or '（待填写）'}",
+                    f"- 风格：{golden_finger_style or '（待填写）'}",
+                    "- 成长曲线：",
+                    "",
+                ]
+            ).rstrip()
+            + "\n"
+        )
     else:
         protagonist_content = _apply_label_replacements(
             protagonist_content,
@@ -538,33 +548,36 @@ def init_project(
 
     golden_finger_content = output_golden_finger.strip() if output_golden_finger else ""
     if not golden_finger_content:
-        golden_finger_content = "\n".join(
-            [
-                "# 金手指设计",
-                "",
-                f"> 项目：{title}｜题材：{genre}｜创建：{now}",
-                "",
-                "## 选型",
-                f"- 称呼：{golden_finger_name or '（待填写）'}",
-                f"- 类型：{golden_finger_type or '（待填写）'}",
-                f"- 风格：{golden_finger_style or '（待填写）'}",
-                "",
-                "## 规则（必须写清）",
-                "- 触发条件：",
-                "- 冷却/代价：",
-                "- 上限：",
-                "- 反噬/风险：",
-                "",
-                "## 成长曲线（章节规划）",
-                "- Lv1：",
-                "- Lv2：",
-                "- Lv3：",
-                "",
-                "## 模板参考（可删/可改）",
-                "",
-                (golden_finger_templates.strip() + "\n") if golden_finger_templates else "（未找到金手指模板库）\n",
-            ]
-        ).rstrip() + "\n"
+        golden_finger_content = (
+            "\n".join(
+                [
+                    "# 金手指设计",
+                    "",
+                    f"> 项目：{title}｜题材：{genre}｜创建：{now}",
+                    "",
+                    "## 选型",
+                    f"- 称呼：{golden_finger_name or '（待填写）'}",
+                    f"- 类型：{golden_finger_type or '（待填写）'}",
+                    f"- 风格：{golden_finger_style or '（待填写）'}",
+                    "",
+                    "## 规则（必须写清）",
+                    "- 触发条件：",
+                    "- 冷却/代价：",
+                    "- 上限：",
+                    "- 反噬/风险：",
+                    "",
+                    "## 成长曲线（章节规划）",
+                    "- Lv1：",
+                    "- Lv2：",
+                    "- Lv3：",
+                    "",
+                    "## 模板参考（可删/可改）",
+                    "",
+                    (golden_finger_templates.strip() + "\n") if golden_finger_templates else "（未找到金手指模板库）\n",
+                ]
+            ).rstrip()
+            + "\n"
+        )
     else:
         golden_finger_content = _apply_label_replacements(
             golden_finger_content,
@@ -588,20 +601,23 @@ def init_project(
 
     antagonist_content = output_antagonist.strip() if output_antagonist else ""
     if not antagonist_content:
-        antagonist_content = "\n".join(
-            [
-                "# 反派设计",
-                "",
-                f"> 项目：{title}｜创建：{now}",
-                "",
-                f"- 反派等级：{antagonist_level or '（待填写）'}",
-                "- 动机：",
-                "- 资源/势力：",
-                "- 与主角的镜像关系：",
-                "- 终局：",
-                "",
-            ]
-        ).rstrip() + "\n"
+        antagonist_content = (
+            "\n".join(
+                [
+                    "# 反派设计",
+                    "",
+                    f"> 项目：{title}｜创建：{now}",
+                    "",
+                    f"- 反派等级：{antagonist_level or '（待填写）'}",
+                    "- 动机：",
+                    "- 资源/势力：",
+                    "- 与主角的镜像关系：",
+                    "- 终局：",
+                    "",
+                ]
+            ).rstrip()
+            + "\n"
+        )
     else:
         tier_map = _parse_tier_map(antagonist_tiers)
         if tier_map:
@@ -680,9 +696,9 @@ def init_project(
         + "\n",
     )
 
-    # Git 初始化（仅当项目目录内尚无 .git 且 Git 可用）
+    # Git 初始化（显式要求时才执行）
     git_dir = project_path / ".git"
-    if not git_dir.exists():
+    if git_init and not git_dir.exists():
         if not is_git_available():
             print("\n⚠️  Git 不可用，跳过版本控制初始化")
             print("💡 如需启用 Git 版本控制，请安装 Git: https://git-scm.com/")
@@ -756,7 +772,7 @@ __pycache__/
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="网文项目初始化脚本（生成项目结构 + state.json + 基础模板）")
-    parser.add_argument("project_dir", help="项目目录（建议 ./webnovel-project）")
+    parser.add_argument("project_dir", help="项目目录（建议 ~/Projects/webnovel-workspace/books/<book_slug>）")
     parser.add_argument("title", help="小说标题")
     parser.add_argument(
         "genre",
@@ -790,6 +806,7 @@ def main() -> None:
     parser.add_argument("--sect-hierarchy", default="", help="宗门/组织层级")
     parser.add_argument("--cultivation-chain", default="", help="典型境界链")
     parser.add_argument("--cultivation-subtiers", default="", help="小境界划分（初/中/后/巅 等）")
+    parser.add_argument("--git-init", action="store_true", help="为这本书初始化独立 Git 仓库（默认关闭）")
 
     # 深度模式可选参数（用于预填模板）
     parser.add_argument("--protagonist-desire", default="", help="主角核心欲望（深度模式）")
@@ -837,6 +854,7 @@ def main() -> None:
         sect_hierarchy=args.sect_hierarchy,
         cultivation_chain=args.cultivation_chain,
         cultivation_subtiers=args.cultivation_subtiers,
+        git_init=args.git_init,
     )
 
 

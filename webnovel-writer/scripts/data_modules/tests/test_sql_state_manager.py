@@ -11,12 +11,12 @@ import pytest
 
 import data_modules.sql_state_manager as sql_state_manager_module
 from data_modules.sql_state_manager import SQLStateManager, EntityData
-from data_modules.index_manager import EntityMeta
 
 
 @pytest.fixture
 def temp_project(tmp_path):
     from data_modules.config import DataModulesConfig
+
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
     return cfg
@@ -58,9 +58,7 @@ def test_sql_state_manager_entity_and_alias(temp_project):
 
 def test_sql_state_manager_state_changes_and_relationships(temp_project):
     manager = SQLStateManager(temp_project)
-    manager.upsert_entity(
-        EntityData(id="xiaoyan", type="角色", name="萧炎", current={})
-    )
+    manager.upsert_entity(EntityData(id="xiaoyan", type="角色", name="萧炎", current={}))
     change_id = manager.record_state_change(
         entity_id="xiaoyan",
         field="realm",
@@ -93,15 +91,9 @@ def test_sql_state_manager_process_chapter_entities_and_exports(temp_project):
     stats = manager.process_chapter_entities(
         chapter=10,
         entities_appeared=[{"id": "xiaoyan", "mentions": ["萧炎"], "confidence": 0.9}],
-        entities_new=[
-            {"suggested_id": "yaolao", "name": "药老", "type": "角色", "tier": "重要"}
-        ],
-        state_changes=[
-            {"entity_id": "yaolao", "field": "status", "old": "", "new": "出场", "reason": "登场"}
-        ],
-        relationships_new=[
-            {"from": "xiaoyan", "to": "yaolao", "type": "师徒", "description": "收徒"}
-        ],
+        entities_new=[{"suggested_id": "yaolao", "name": "药老", "type": "角色", "tier": "重要"}],
+        state_changes=[{"entity_id": "yaolao", "field": "status", "old": "", "new": "出场", "reason": "登场"}],
+        relationships_new=[{"from": "xiaoyan", "to": "yaolao", "type": "师徒", "description": "收徒"}],
     )
     assert stats["entities_created"] >= 1
     assert stats["relationships"] == 1
@@ -117,20 +109,14 @@ def test_sql_state_manager_process_chapter_entities_and_exports(temp_project):
 
 def test_sql_state_manager_existing_entity_updates_and_stats(temp_project):
     manager = SQLStateManager(temp_project)
-    manager.upsert_entity(
-        EntityData(id="xiaoyan", type="角色", name="萧炎", current={"hp": 5})
-    )
+    manager.upsert_entity(EntityData(id="xiaoyan", type="角色", name="萧炎", current={"hp": 5}))
 
     stats = manager.process_chapter_entities(
         chapter=3,
         entities_appeared=[{"id": "xiaoyan", "mentions": ["萧炎"], "confidence": 0.9}],
         entities_new=[],
-        state_changes=[
-            {"entity_id": "xiaoyan", "field": "hp", "old": 5, "new": 0, "reason": "受伤"}
-        ],
-        relationships_new=[
-            {"from_entity": "xiaoyan", "to_entity": "yaolao", "type": "师徒", "description": "收徒"}
-        ],
+        state_changes=[{"entity_id": "xiaoyan", "field": "hp", "old": 5, "new": 0, "reason": "受伤"}],
+        relationships_new=[{"from_entity": "xiaoyan", "to_entity": "yaolao", "type": "师徒", "description": "收徒"}],
     )
     assert stats["entities_updated"] >= 1
     assert stats["state_changes"] == 1
@@ -174,9 +160,7 @@ def test_sql_state_manager_export_protagonist_and_cli(temp_project, monkeypatch,
     out = run_cli(["sql_state_manager", "--project-root", str(temp_project.project_root), "get-protagonist"])
     assert out.get("status") == "error"
 
-    manager.upsert_entity(
-        EntityData(id="xiaoyan", type="角色", name="萧炎", is_protagonist=True)
-    )
+    manager.upsert_entity(EntityData(id="xiaoyan", type="角色", name="萧炎", is_protagonist=True))
     exported = manager.export_to_entities_v3_format()
     assert exported["角色"]["xiaoyan"]["is_protagonist"] is True
 
@@ -200,14 +184,16 @@ def test_sql_state_manager_export_protagonist_and_cli(temp_project, monkeypatch,
     assert isinstance(out.get("data", {}), dict)
 
     payload = json.dumps({"entities_appeared": [], "entities_new": [], "state_changes": [], "relationships_new": []})
-    out = run_cli([
-        "sql_state_manager",
-        "--project-root",
-        str(temp_project.project_root),
-        "process-chapter",
-        "--chapter",
-        "2",
-        "--data",
-        payload,
-    ])
+    out = run_cli(
+        [
+            "sql_state_manager",
+            "--project-root",
+            str(temp_project.project_root),
+            "process-chapter",
+            "--chapter",
+            "2",
+            "--data",
+            payload,
+        ]
+    )
     assert out["status"] == "success"

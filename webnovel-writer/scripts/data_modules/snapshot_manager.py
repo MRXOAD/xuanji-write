@@ -3,6 +3,7 @@
 """
 Context snapshot manager.
 """
+
 from __future__ import annotations
 
 import json

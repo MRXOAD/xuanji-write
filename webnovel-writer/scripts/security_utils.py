@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional, Union
 # 尝试导入 filelock（可选依赖）
 try:
     from filelock import FileLock
+
     HAS_FILELOCK = True
 except ImportError:
     HAS_FILELOCK = False
@@ -57,21 +58,21 @@ def sanitize_filename(name: str, max_length: int = 100) -> str:
     safe_name = os.path.basename(name)
 
     # Step 2: 移除路径分隔符（双重保险）
-    safe_name = safe_name.replace('/', '_').replace('\\', '_')
+    safe_name = safe_name.replace("/", "_").replace("\\", "_")
 
     # Step 3: 只保留安全字符
     # 允许：中文(\u4e00-\u9fff)、字母(a-zA-Z)、数字(0-9)、下划线(_)、连字符(-)
-    safe_name = re.sub(r'[^\w\u4e00-\u9fff-]', '_', safe_name)
+    safe_name = re.sub(r"[^\w\u4e00-\u9fff-]", "_", safe_name)
 
     # Step 4: 移除连续的下划线（美化）
-    safe_name = re.sub(r'_+', '_', safe_name)
+    safe_name = re.sub(r"_+", "_", safe_name)
 
     # Step 5: 长度限制
     if len(safe_name) > max_length:
         safe_name = safe_name[:max_length]
 
     # Step 6: 移除首尾下划线
-    safe_name = safe_name.strip('_')
+    safe_name = safe_name.strip("_")
 
     # Step 7: 确保非空（防御性编程）
     if not safe_name:
@@ -106,19 +107,19 @@ def sanitize_commit_message(message: str, max_length: int = 200) -> str:
         - ✅ 防止单字母标志（-x）
     """
     # Step 1: 移除换行符（防止多行参数注入）
-    safe_msg = message.replace('\n', ' ').replace('\r', ' ')
+    safe_msg = message.replace("\n", " ").replace("\r", " ")
 
     # Step 2: 移除Git特殊标志（--开头的参数）
-    safe_msg = re.sub(r'--[\w-]+', '', safe_msg)
+    safe_msg = re.sub(r"--[\w-]+", "", safe_msg)
 
     # Step 3: 移除引号（防止参数分隔符混淆）
-    safe_msg = safe_msg.replace("'", "").replace('"', '')
+    safe_msg = safe_msg.replace("'", "").replace('"', "")
 
     # Step 4: 移除前导的-（防止单字母标志如-m）
-    safe_msg = safe_msg.lstrip('-')
+    safe_msg = safe_msg.lstrip("-")
 
     # Step 5: 移除连续空格（美化）
-    safe_msg = re.sub(r'\s+', ' ', safe_msg)
+    safe_msg = re.sub(r"\s+", " ", safe_msg)
 
     # Step 6: 长度限制
     if len(safe_msg) > max_length:
@@ -160,13 +161,13 @@ def create_secure_directory(path: str, mode: int = 0o700) -> Path:
 
     # Windows 上传入 mode 会触发不可预期的 ACL 行为（实测会导致目录创建后立刻无法访问）。
     # 因此在 Windows 下不传 mode，保持默认继承权限；在类 Unix 系统才使用 mode。
-    if os.name == 'nt':
+    if os.name == "nt":
         os.makedirs(path, exist_ok=True)
     else:
         os.makedirs(path, mode=mode, exist_ok=True)
 
     # 双重保险：显式设置权限（某些系统可能忽略makedirs的mode参数）
-    if os.name != 'nt':  # Unix系统（Linux/macOS）
+    if os.name != "nt":  # Unix系统（Linux/macOS）
         os.chmod(path, mode)
 
     return path_obj
@@ -186,11 +187,11 @@ def create_secure_file(file_path: str, content: str, mode: int = 0o600) -> None:
         - ✅ 防止其他用户访问
     """
     # 创建文件
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
 
     # 设置权限（仅Unix系统）
-    if os.name != 'nt':
+    if os.name != "nt":
         os.chmod(file_path, mode)
 
 
@@ -250,12 +251,7 @@ def is_git_available() -> bool:
     import subprocess
 
     try:
-        result = subprocess.run(
-            ["git", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["git", "--version"], capture_output=True, text=True, timeout=5)
         _git_available = result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         _git_available = False
@@ -282,10 +278,7 @@ def is_git_repo(path: Union[str, Path]) -> bool:
 
 
 def git_graceful_operation(
-    args: list,
-    cwd: Union[str, Path],
-    *,
-    fallback_msg: str = "Git 不可用，跳过版本控制操作"
+    args: list, cwd: Union[str, Path], *, fallback_msg: str = "Git 不可用，跳过版本控制操作"
 ) -> tuple:
     """
     优雅执行 Git 操作（Git 不可用时静默降级）
@@ -315,14 +308,7 @@ def git_graceful_operation(
     import subprocess
 
     try:
-        result = subprocess.run(
-            ["git"] + args,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            timeout=60
-        )
+        result = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=60)
         return result.returncode == 0, result.stdout, False
     except subprocess.TimeoutExpired:
         print(f"⚠️  Git 操作超时: git {' '.join(args)}", file=sys.stderr)
@@ -339,16 +325,12 @@ def git_graceful_operation(
 
 class AtomicWriteError(Exception):
     """原子写入失败异常"""
+
     pass
 
 
 def atomic_write_json(
-    file_path: Union[str, Path],
-    data: Dict[str, Any],
-    *,
-    use_lock: bool = True,
-    backup: bool = True,
-    indent: int = 2
+    file_path: Union[str, Path], data: Dict[str, Any], *, use_lock: bool = True, backup: bool = True, indent: int = 2
 ) -> None:
     """
     原子化写入 JSON 文件，防止并发冲突和数据损坏 (CWE-362, CWE-367)
@@ -391,19 +373,15 @@ def atomic_write_json(
         raise AtomicWriteError(f"JSON 序列化失败: {e}")
 
     # 锁文件路径
-    lock_path = file_path.with_suffix(file_path.suffix + '.lock')
-    backup_path = file_path.with_suffix(file_path.suffix + '.bak')
+    lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+    backup_path = file_path.with_suffix(file_path.suffix + ".bak")
 
     # 创建临时文件（同目录确保同文件系统，os.replace 才能原子操作）
-    fd, temp_path = tempfile.mkstemp(
-        suffix='.tmp',
-        prefix=file_path.stem + '_',
-        dir=parent_dir
-    )
+    fd, temp_path = tempfile.mkstemp(suffix=".tmp", prefix=file_path.stem + "_", dir=parent_dir)
 
     try:
         # Step 1: 写入临时文件
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(json_content)
             f.flush()
             os.fsync(f.fileno())  # 确保写入磁盘
@@ -419,6 +397,7 @@ def atomic_write_json(
             if backup and file_path.exists():
                 try:
                     import shutil
+
                     shutil.copy2(file_path, backup_path)
                 except OSError:
                     pass  # 备份失败不阻止写入
@@ -443,10 +422,7 @@ def atomic_write_json(
                 pass
 
 
-def read_json_safe(
-    file_path: Union[str, Path],
-    default: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+def read_json_safe(file_path: Union[str, Path], default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     安全读取 JSON 文件（带默认值和错误处理）
 
@@ -468,7 +444,7 @@ def read_json_safe(
         return default
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         print(f"⚠️ 读取 JSON 失败 ({file_path}): {e}", file=sys.stderr)
@@ -490,7 +466,7 @@ def restore_from_backup(file_path: Union[str, Path]) -> bool:
         True
     """
     file_path = Path(file_path)
-    backup_path = file_path.with_suffix(file_path.suffix + '.bak')
+    backup_path = file_path.with_suffix(file_path.suffix + ".bak")
 
     if not backup_path.exists():
         print(f"⚠️ 备份文件不存在: {backup_path}", file=sys.stderr)
@@ -498,6 +474,7 @@ def restore_from_backup(file_path: Union[str, Path]) -> bool:
 
     try:
         import shutil
+
         shutil.copy2(backup_path, file_path)
         print(f"✅ 已从备份恢复: {file_path}")
         return True
@@ -509,6 +486,7 @@ def restore_from_backup(file_path: Union[str, Path]) -> bool:
 # ============================================================================
 # 单元测试（内置自检）
 # ============================================================================
+
 
 def _run_self_tests():
     """运行内置安全测试"""
@@ -544,6 +522,7 @@ def _run_self_tests():
 
     # Test 4: atomic_write_json
     import tempfile as tf
+
     test_dir = Path(tf.mkdtemp())
     test_file = test_dir / "test_state.json"
 
@@ -553,23 +532,24 @@ def _run_self_tests():
     assert test_file.exists(), "原子写入未创建文件"
 
     # 读取验证
-    with open(test_file, 'r', encoding='utf-8') as f:
+    with open(test_file, "r", encoding="utf-8") as f:
         loaded = json.load(f)
     assert loaded == test_data, "原子写入数据不匹配"
 
     # 备份测试
     atomic_write_json(test_file, {"updated": True}, use_lock=False, backup=True)
-    backup_file = test_file.with_suffix('.json.bak')
+    backup_file = test_file.with_suffix(".json.bak")
     assert backup_file.exists(), "备份未创建"
 
     # 恢复测试
     restore_from_backup(test_file)
-    with open(test_file, 'r', encoding='utf-8') as f:
+    with open(test_file, "r", encoding="utf-8") as f:
         restored = json.load(f)
     assert restored == test_data, "恢复数据不匹配"
 
     # 清理
     import shutil
+
     shutil.rmtree(test_dir)
     print("  ✅ atomic_write_json: 所有测试通过")
     if HAS_FILELOCK:

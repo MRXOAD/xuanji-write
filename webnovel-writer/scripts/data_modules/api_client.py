@@ -33,6 +33,7 @@ from .config import get_config
 @dataclass
 class APIStats:
     """API 调用统计"""
+
     total_calls: int = 0
     total_time: float = 0.0
     errors: int = 0
@@ -88,17 +89,10 @@ class EmbeddingAPIClient:
     def _build_payload(self, texts: List[str]) -> Dict[str, Any]:
         """构建请求体"""
         if self.config.embed_api_type == "openai":
-            return {
-                "input": texts,
-                "model": self.config.embed_model,
-                "encoding_format": "float"
-            }
+            return {"input": texts, "model": self.config.embed_model, "encoding_format": "float"}
         else:
             # Modal 格式
-            return {
-                "input": texts,
-                "model": self.config.embed_model
-            }
+            return {"input": texts, "model": self.config.embed_model}
 
     def _parse_response(self, data: Dict[str, Any]) -> Optional[List[List[float]]]:
         """解析响应"""
@@ -124,8 +118,8 @@ class EmbeddingAPIClient:
         texts = [t if t else " " for t in texts]
 
         timeout = self.config.cold_start_timeout if not self._warmed_up else self.config.normal_timeout
-        max_retries = getattr(self.config, 'api_max_retries', 3)
-        base_delay = getattr(self.config, 'api_retry_delay', 1.0)
+        max_retries = getattr(self.config, "api_max_retries", 3)
+        base_delay = getattr(self.config, "api_retry_delay", 1.0)
 
         async with self.sem:
             start = time.time()
@@ -138,14 +132,12 @@ class EmbeddingAPIClient:
                     payload = self._build_payload(texts)
 
                     async with session.post(
-                        url,
-                        json=payload,
-                        headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=timeout)
+                        url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)
                     ) as resp:
                         if resp.status == 200:
                             text = await resp.text()
                             import json as json_module
+
                             data = json_module.loads(text)
                             embeddings = self._parse_response(data)
 
@@ -159,7 +151,7 @@ class EmbeddingAPIClient:
 
                         # 可重试的状态码: 429 (限流), 500, 502, 503, 504
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)  # 指数退避
+                            delay = base_delay * (2**attempt)  # 指数退避
                             print(f"[WARN] Embed {resp.status}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                             await asyncio.sleep(delay)
                             continue
@@ -173,7 +165,7 @@ class EmbeddingAPIClient:
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2**attempt)
                         print(f"[WARN] Embed timeout, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
@@ -185,7 +177,7 @@ class EmbeddingAPIClient:
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2**attempt)
                         print(f"[WARN] Embed error: {e}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
@@ -197,9 +189,7 @@ class EmbeddingAPIClient:
 
             return None
 
-    async def embed_batch(
-        self, texts: List[str], *, skip_failures: bool = True
-    ) -> List[Optional[List[float]]]:
+    async def embed_batch(self, texts: List[str], *, skip_failures: bool = True) -> List[Optional[List[float]]]:
         """
         分批 Embedding
 
@@ -216,7 +206,7 @@ class EmbeddingAPIClient:
         all_embeddings: List[Optional[List[float]]] = []
         batch_size = self.config.embed_batch_size
 
-        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
         tasks = [self.embed(batch) for batch in batches]
         results = await asyncio.gather(*tasks)
 
@@ -231,7 +221,7 @@ class EmbeddingAPIClient:
                 print(f"[WARN] Embed batch {batch_idx} failed, marking {actual_batch_size} items as None")
                 all_embeddings.extend([None] * actual_batch_size)
 
-        return all_embeddings[:len(texts)]
+        return all_embeddings[: len(texts)]
 
     async def warmup(self):
         """预热服务"""
@@ -288,11 +278,7 @@ class RerankAPIClient:
         """构建请求体"""
         if self.config.rerank_api_type == "openai":
             # Jina/Cohere 格式
-            payload: Dict[str, Any] = {
-                "query": query,
-                "documents": documents,
-                "model": self.config.rerank_model
-            }
+            payload: Dict[str, Any] = {"query": query, "documents": documents, "model": self.config.rerank_model}
             if top_n:
                 payload["top_n"] = top_n
             return payload
@@ -313,18 +299,15 @@ class RerankAPIClient:
             return data.get("results", [])
 
     async def rerank(
-        self,
-        query: str,
-        documents: List[str],
-        top_n: Optional[int] = None
+        self, query: str, documents: List[str], top_n: Optional[int] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """调用 Rerank 服务（带重试机制）"""
         if not documents:
             return []
 
         timeout = self.config.cold_start_timeout if not self._warmed_up else self.config.normal_timeout
-        max_retries = getattr(self.config, 'api_max_retries', 3)
-        base_delay = getattr(self.config, 'api_retry_delay', 1.0)
+        max_retries = getattr(self.config, "api_max_retries", 3)
+        base_delay = getattr(self.config, "api_retry_delay", 1.0)
 
         async with self.sem:
             start = time.time()
@@ -337,10 +320,7 @@ class RerankAPIClient:
                     payload = self._build_payload(query, documents, top_n)
 
                     async with session.post(
-                        url,
-                        json=payload,
-                        headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=timeout)
+                        url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)
                     ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
@@ -353,8 +333,10 @@ class RerankAPIClient:
 
                         # 可重试的状态码
                         if resp.status in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt)
-                            print(f"[WARN] Rerank {resp.status}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
+                            delay = base_delay * (2**attempt)
+                            print(
+                                f"[WARN] Rerank {resp.status}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})"
+                            )
                             await asyncio.sleep(delay)
                             continue
 
@@ -365,7 +347,7 @@ class RerankAPIClient:
 
                 except asyncio.TimeoutError:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2**attempt)
                         print(f"[WARN] Rerank timeout, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
@@ -375,7 +357,7 @@ class RerankAPIClient:
 
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
+                        delay = base_delay * (2**attempt)
                         print(f"[WARN] Rerank error: {e}, retrying in {delay:.1f}s ({attempt + 1}/{max_retries})")
                         await asyncio.sleep(delay)
                         continue
@@ -412,10 +394,7 @@ class ModalAPIClient:
 
     @property
     def stats(self) -> Dict[str, APIStats]:
-        return {
-            "embed": self._embed_client.stats,
-            "rerank": self._rerank_client.stats
-        }
+        return {"embed": self._embed_client.stats, "rerank": self._rerank_client.stats}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         # 复用 embed client 的 session
@@ -457,19 +436,14 @@ class ModalAPIClient:
         """调用 Embedding 服务"""
         return await self._embed_client.embed(texts)
 
-    async def embed_batch(
-        self, texts: List[str], *, skip_failures: bool = True
-    ) -> List[Optional[List[float]]]:
+    async def embed_batch(self, texts: List[str], *, skip_failures: bool = True) -> List[Optional[List[float]]]:
         """分批 Embedding"""
         return await self._embed_client.embed_batch(texts, skip_failures=skip_failures)
 
     # ==================== Rerank API ====================
 
     async def rerank(
-        self,
-        query: str,
-        documents: List[str],
-        top_n: Optional[int] = None
+        self, query: str, documents: List[str], top_n: Optional[int] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """调用 Rerank 服务"""
         return await self._rerank_client.rerank(query, documents, top_n)
@@ -481,10 +455,12 @@ class ModalAPIClient:
         for name, stats in self.stats.items():
             if stats.total_calls > 0:
                 avg_time = stats.total_time / stats.total_calls
-                print(f"  {name.upper()}: {stats.total_calls} calls, "
-                      f"{stats.total_time:.1f}s total, "
-                      f"{avg_time:.2f}s avg, "
-                      f"{stats.errors} errors")
+                print(
+                    f"  {name.upper()}: {stats.total_calls} calls, "
+                    f"{stats.total_time:.1f}s total, "
+                    f"{avg_time:.2f}s avg, "
+                    f"{stats.errors} errors"
+                )
 
 
 # 全局客户端

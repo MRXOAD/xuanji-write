@@ -18,7 +18,6 @@ import logging
 import sys
 import time
 from copy import deepcopy
-from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
 from typing import Dict, List, Optional, Any
@@ -43,6 +42,7 @@ except ImportError:  # pragma: no cover
 @dataclass
 class EntityState:
     """实体状态"""
+
     id: str
     name: str
     type: str  # 角色/地点/物品/势力
@@ -56,6 +56,7 @@ class EntityState:
 @dataclass
 class Relationship:
     """实体关系"""
+
     from_entity: str
     to_entity: str
     type: str
@@ -66,6 +67,7 @@ class Relationship:
 @dataclass
 class StateChange:
     """状态变化记录"""
+
     entity_id: str
     field: str
     old_value: Any
@@ -78,6 +80,7 @@ class StateChange:
 @dataclass
 class _EntityPatch:
     """待写入的实体增量补丁（用于锁内合并）"""
+
     entity_type: str
     entity_id: str
     replace: bool = False
@@ -112,6 +115,7 @@ class StateManager:
         if enable_sqlite_sync:
             try:
                 from .sql_state_manager import SQLStateManager
+
                 self._sql_state_manager = SQLStateManager(self.config)
             except ImportError:
                 pass  # SQLStateManager 不可用时静默降级
@@ -133,7 +137,7 @@ class StateManager:
             "entities_new": [],
             "state_changes": [],
             "relationships_new": [],
-            "chapter": None
+            "chapter": None,
         }
 
         self._load_state()
@@ -387,7 +391,7 @@ class StateManager:
                     entities_appeared=sqlite_data.get("entities_appeared", []),
                     entities_new=sqlite_data.get("entities_new", []),
                     state_changes=sqlite_data.get("state_changes", []),
-                    relationships_new=sqlite_data.get("relationships_new", [])
+                    relationships_new=sqlite_data.get("relationships_new", []),
                 )
                 # 标记已处理的出场记录
                 for entity in sqlite_data.get("entities_appeared", []):
@@ -439,7 +443,7 @@ class StateManager:
                         aliases=[],
                         first_appearance=patch.base_entity.get("first_appearance", 0),
                         last_appearance=patch.base_entity.get("last_appearance", 0),
-                        is_protagonist=patch.base_entity.get("is_protagonist", False)
+                        is_protagonist=patch.base_entity.get("is_protagonist", False),
                     )
                     self._sql_state_manager.upsert_entity(entity_data)
 
@@ -451,19 +455,21 @@ class StateManager:
                                 chapter=patch.appearance_chapter,
                                 mentions=[entity_data.name],
                                 confidence=1.0,
-                                skip_if_exists=True  # 关键：不覆盖已有记录
+                                skip_if_exists=True,  # 关键：不覆盖已有记录
                             )
                 else:
                     # 更新现有实体
-                    has_metadata_updates = bool(patch.top_updates and
-                                                 any(k in METADATA_FIELDS for k in patch.top_updates))
+                    has_metadata_updates = bool(
+                        patch.top_updates and any(k in METADATA_FIELDS for k in patch.top_updates)
+                    )
 
                     # 非元数据的 top_updates 应该当作 current 更新
                     # 例如：realm, layer, location 等状态字段
-                    non_metadata_top_updates = {
-                        k: v for k, v in patch.top_updates.items()
-                        if k not in METADATA_FIELDS
-                    } if patch.top_updates else {}
+                    non_metadata_top_updates = (
+                        {k: v for k, v in patch.top_updates.items() if k not in METADATA_FIELDS}
+                        if patch.top_updates
+                        else {}
+                    )
 
                     # 合并 current_updates 和非元数据的 top_updates
                     effective_current_updates = {**non_metadata_top_updates}
@@ -478,6 +484,7 @@ class StateManager:
                             current = existing.get("current_json", {})
                             if isinstance(current, str):
                                 import json
+
                                 current = json.loads(current) if current else {}
                             if effective_current_updates:
                                 current.update(effective_current_updates)
@@ -494,8 +501,10 @@ class StateManager:
                                 current=current,
                                 first_appearance=existing.get("first_appearance", 0),
                                 last_appearance=patch.appearance_chapter or existing.get("last_appearance", 0),
-                                is_protagonist=patch.top_updates.get("is_protagonist", existing.get("is_protagonist", False)),
-                                is_archived=patch.top_updates.get("is_archived", existing.get("is_archived", False))
+                                is_protagonist=patch.top_updates.get(
+                                    "is_protagonist", existing.get("is_protagonist", False)
+                                ),
+                                is_archived=patch.top_updates.get("is_archived", existing.get("is_archived", False)),
                             )
                             self._sql_state_manager._index_manager.upsert_entity(entity_meta, update_metadata=True)
 
@@ -519,7 +528,7 @@ class StateManager:
                                 chapter=patch.appearance_chapter,
                                 mentions=[],
                                 confidence=1.0,
-                                skip_if_exists=True  # 关键：不覆盖已有记录
+                                skip_if_exists=True,  # 关键：不覆盖已有记录
                             )
 
             # 同步别名
@@ -538,7 +547,7 @@ class StateManager:
                     old_value=change.get("old", change.get("old_value", "")),
                     new_value=change.get("new", change.get("new_value", "")),
                     reason=change.get("reason", ""),
-                    chapter=change.get("chapter", 0)
+                    chapter=change.get("chapter", 0),
                 )
 
             # 同步关系
@@ -548,7 +557,7 @@ class StateManager:
                     to_entity=rel.get("to_entity", ""),
                     type=rel.get("type", "相识"),
                     description=rel.get("description", ""),
-                    chapter=rel.get("chapter", 0)
+                    chapter=rel.get("chapter", 0),
                 )
 
             return True
@@ -574,13 +583,16 @@ class StateManager:
         self._pending_alias_entries = snapshot.get("alias_entries", {})
         self._pending_state_changes = snapshot.get("state_changes", [])
         self._pending_structured_relationships = snapshot.get("structured_relationships", [])
-        self._pending_sqlite_data = snapshot.get("sqlite_data", {
-            "entities_appeared": [],
-            "entities_new": [],
-            "state_changes": [],
-            "relationships_new": [],
-            "chapter": None,
-        })
+        self._pending_sqlite_data = snapshot.get(
+            "sqlite_data",
+            {
+                "entities_appeared": [],
+                "entities_new": [],
+                "state_changes": [],
+                "relationships_new": [],
+                "chapter": None,
+            },
+        )
 
     def _clear_pending_sqlite_data(self):
         """清空待同步的 SQLite 数据"""
@@ -589,7 +601,7 @@ class StateManager:
             "entities_new": [],
             "state_changes": [],
             "relationships_new": [],
-            "chapter": None
+            "chapter": None,
         }
 
     # ==================== 进度管理 ====================
@@ -728,7 +740,7 @@ class StateManager:
             "current": entity.attributes,
             "first_appearance": entity.first_appearance,
             "last_appearance": entity.last_appearance,
-            "history": []
+            "history": [],
         }
         self._state["entities_v3"][entity_type][entity.id] = v3_entity
 
@@ -846,25 +858,14 @@ class StateManager:
     # ==================== 状态变化记录 ====================
 
     def record_state_change(
-        self,
-        entity_id: str,
-        field: str,
-        old_value: Any,
-        new_value: Any,
-        reason: str,
-        chapter: int
+        self, entity_id: str, field: str, old_value: Any, new_value: Any, reason: str, chapter: int
     ):
         """记录状态变化"""
         if "state_changes" not in self._state:
             self._state["state_changes"] = []
 
         change = StateChange(
-            entity_id=entity_id,
-            field=field,
-            old_value=old_value,
-            new_value=new_value,
-            reason=reason,
-            chapter=chapter
+            entity_id=entity_id, field=field, old_value=old_value, new_value=new_value, reason=reason, chapter=chapter
         )
         change_dict = asdict(change)
         self._state["state_changes"].append(change_dict)
@@ -882,21 +883,10 @@ class StateManager:
 
     # ==================== 关系管理 ====================
 
-    def add_relationship(
-        self,
-        from_entity: str,
-        to_entity: str,
-        rel_type: str,
-        description: str,
-        chapter: int
-    ):
+    def add_relationship(self, from_entity: str, to_entity: str, rel_type: str, description: str, chapter: int):
         """添加关系"""
         rel = Relationship(
-            from_entity=from_entity,
-            to_entity=to_entity,
-            type=rel_type,
-            description=description,
-            chapter=chapter
+            from_entity=from_entity, to_entity=to_entity, type=rel_type, description=description, chapter=chapter
         )
 
         # v5.0 引入: 实体关系存入 structured_relationships，避免与 relationships(人物关系字典) 冲突
@@ -910,10 +900,7 @@ class StateManager:
         """获取关系列表"""
         rels = self._state.get("structured_relationships", [])
         if entity_id:
-            rels = [
-                r for r in rels
-                if r.get("from_entity") == entity_id or r.get("to_entity") == entity_id
-            ]
+            rels = [r for r in rels if r.get("from_entity") == entity_id or r.get("to_entity") == entity_id]
         return rels
 
     # ==================== 批量操作 ====================
@@ -1044,7 +1031,7 @@ class StateManager:
                     tier=entity.get("tier", "装饰"),
                     aliases=entity.get("mentions", []),
                     first_appearance=chapter,
-                    last_appearance=chapter
+                    last_appearance=chapter,
                 )
                 if not self.add_entity(new_entity):
                     warnings.append(f"实体已存在: {entity_id}")
@@ -1059,7 +1046,7 @@ class StateManager:
                 old_value=change.get("old"),
                 new_value=change.get("new"),
                 reason=change.get("reason", ""),
-                chapter=chapter
+                chapter=chapter,
             )
             # v5.1 引入: 缓存用于 SQLite 同步
             self._pending_sqlite_data["state_changes"].append(change)
@@ -1071,7 +1058,7 @@ class StateManager:
                 to_entity=rel.get("to", ""),
                 rel_type=rel.get("type", ""),
                 description=rel.get("description", ""),
-                chapter=chapter
+                chapter=chapter,
             )
             # v5.1 引入: 缓存用于 SQLite 同步
             self._pending_sqlite_data["relationships_new"].append(rel)
@@ -1107,7 +1094,7 @@ class StateManager:
                     "name": e.get("canonical_name", eid),
                     "type": type_name,
                     "tier": e.get("tier", "装饰"),
-                    "current": e.get("current", {})
+                    "current": e.get("current", {}),
                 }
 
         return {
@@ -1117,8 +1104,8 @@ class StateManager:
             "alias_index": {},
             "recent_changes": [],  # v5.1 引入: 从 index.db 查询
             "disambiguation": {
-                "warnings": self._state.get("disambiguation_warnings", [])[-self.config.export_disambiguation_slice:],
-                "pending": self._state.get("disambiguation_pending", [])[-self.config.export_disambiguation_slice:],
+                "warnings": self._state.get("disambiguation_warnings", [])[-self.config.export_disambiguation_slice :],
+                "pending": self._state.get("disambiguation_pending", [])[-self.config.export_disambiguation_slice :],
             },
         }
 
@@ -1218,6 +1205,7 @@ class StateManager:
 
 # ==================== CLI 接口 ====================
 
+
 def main():
     import argparse
     import sys
@@ -1257,17 +1245,19 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     manager = StateManager(config)
     logger = IndexManager(config)
     tool_name = f"state_manager:{args.command or 'unknown'}"
 
-    def _append_timing(success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None):
+    def _append_timing(
+        success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None
+    ):
         elapsed_ms = int((time.perf_counter() - command_started_at) * 1000)
         safe_append_perf_timing(
             manager.config.project_root,
@@ -1328,12 +1318,16 @@ def main():
                 last_exc = exc
                 data = normalize_data_agent_output(data)
         if validated is None:
-            err = format_validation_error(last_exc) if last_exc else {
-                "code": "SCHEMA_VALIDATION_FAILED",
-                "message": "数据结构校验失败",
-                "details": {"errors": []},
-                "suggestion": "请检查 data-agent 输出字段是否完整且类型正确",
-            }
+            err = (
+                format_validation_error(last_exc)
+                if last_exc
+                else {
+                    "code": "SCHEMA_VALIDATION_FAILED",
+                    "message": "数据结构校验失败",
+                    "details": {"errors": []},
+                    "suggestion": "请检查 data-agent 输出字段是否完整且类型正确",
+                }
+            )
             emit_error(err["code"], err["message"], suggestion=err.get("suggestion"))
             return
 

@@ -7,8 +7,7 @@ IndexChapterMixin extracted from IndexManager.
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 
 class IndexChapterMixin:
@@ -57,10 +56,7 @@ class IndexChapterMixin:
             """,
                 (limit,),
             )
-            return [
-                self._row_to_dict(row, parse_json=["characters"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["characters"]) for row in cursor.fetchall()]
 
     # ==================== 场景操作 ====================
 
@@ -105,10 +101,7 @@ class IndexChapterMixin:
             """,
                 (chapter,),
             )
-            return [
-                self._row_to_dict(row, parse_json=["characters"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["characters"]) for row in cursor.fetchall()]
 
     def search_scenes_by_location(self, location: str, limit: int = None) -> List[Dict]:
         """按地点搜索场景"""
@@ -125,10 +118,7 @@ class IndexChapterMixin:
             """,
                 (f"%{location}%", limit),
             )
-            return [
-                self._row_to_dict(row, parse_json=["characters"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["characters"]) for row in cursor.fetchall()]
 
     # ==================== 出场记录操作 ====================
 
@@ -191,10 +181,7 @@ class IndexChapterMixin:
             """,
                 (entity_id, limit),
             )
-            return [
-                self._row_to_dict(row, parse_json=["mentions"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["mentions"]) for row in cursor.fetchall()]
 
     def get_recent_appearances(self, limit: int = None) -> List[Dict]:
         """获取最近出场的实体"""
@@ -226,10 +213,7 @@ class IndexChapterMixin:
             """,
                 (chapter,),
             )
-            return [
-                self._row_to_dict(row, parse_json=["mentions"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["mentions"]) for row in cursor.fetchall()]
 
     # ==================== v5.1 实体操作 ====================
 
@@ -299,4 +283,3 @@ class IndexChapterMixin:
         return stats
 
     # ==================== 辅助方法 ====================
-

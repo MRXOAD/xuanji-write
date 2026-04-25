@@ -12,9 +12,8 @@ Style Sampler - 风格样本管理模块
 import json
 import sqlite3
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Any
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from contextlib import contextmanager
@@ -25,6 +24,7 @@ from .observability import safe_append_perf_timing, safe_log_tool_call
 
 class SceneType(Enum):
     """场景类型"""
+
     BATTLE = "战斗"
     DIALOGUE = "对话"
     DESCRIPTION = "描写"
@@ -37,6 +37,7 @@ class SceneType(Enum):
 @dataclass
 class StyleSample:
     """风格样本"""
+
     id: str
     chapter: int
     scene_type: str
@@ -93,40 +94,41 @@ class StyleSampler:
         with self._get_conn() as conn:
             cursor = conn.cursor()
             try:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO samples
                     (id, chapter, scene_type, content, score, tags, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    sample.id,
-                    sample.chapter,
-                    sample.scene_type,
-                    sample.content,
-                    sample.score,
-                    json.dumps(sample.tags, ensure_ascii=False),
-                    sample.created_at or datetime.now().isoformat()
-                ))
+                """,
+                    (
+                        sample.id,
+                        sample.chapter,
+                        sample.scene_type,
+                        sample.content,
+                        sample.score,
+                        json.dumps(sample.tags, ensure_ascii=False),
+                        sample.created_at or datetime.now().isoformat(),
+                    ),
+                )
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:
                 return False
 
-    def get_samples_by_type(
-        self,
-        scene_type: str,
-        limit: int = 5,
-        min_score: float = 0.0
-    ) -> List[StyleSample]:
+    def get_samples_by_type(self, scene_type: str, limit: int = 5, min_score: float = 0.0) -> List[StyleSample]:
         """按场景类型获取样本"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, chapter, scene_type, content, score, tags, created_at
                 FROM samples
                 WHERE scene_type = ? AND score >= ?
                 ORDER BY score DESC
                 LIMIT ?
-            """, (scene_type, min_score, limit))
+            """,
+                (scene_type, min_score, limit),
+            )
 
             return [self._row_to_sample(row) for row in cursor.fetchall()]
 
@@ -134,12 +136,15 @@ class StyleSampler:
         """获取最高分样本"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, chapter, scene_type, content, score, tags, created_at
                 FROM samples
                 ORDER BY score DESC
                 LIMIT ?
-            """, (limit,))
+            """,
+                (limit,),
+            )
 
             return [self._row_to_sample(row) for row in cursor.fetchall()]
 
@@ -152,17 +157,13 @@ class StyleSampler:
             content=row[3],
             score=row[4],
             tags=json.loads(row[5]) if row[5] else [],
-            created_at=row[6]
+            created_at=row[6],
         )
 
     # ==================== 样本提取 ====================
 
     def extract_candidates(
-        self,
-        chapter: int,
-        content: str,
-        review_score: float,
-        scenes: List[Dict]
+        self, chapter: int, content: str, review_score: float, scenes: List[Dict]
     ) -> List[StyleSample]:
         """
         从章节中提取风格样本候选
@@ -189,7 +190,7 @@ class StyleSampler:
                 scene_type=scene_type,
                 content=scene_content[:2000],  # 限制长度
                 score=review_score / 100.0,
-                tags=self._extract_tags(scene_content)
+                tags=self._extract_tags(scene_content),
             )
             candidates.append(sample)
 
@@ -238,10 +239,7 @@ class StyleSampler:
     # ==================== 样本选择 ====================
 
     def select_samples_for_chapter(
-        self,
-        chapter_outline: str,
-        target_types: List[str] = None,
-        max_samples: int = 3
+        self, chapter_outline: str, target_types: List[str] = None, max_samples: int = 3
     ) -> List[StyleSample]:
         """
         为章节写作选择合适的风格样本
@@ -299,14 +297,11 @@ class StyleSampler:
             cursor.execute("SELECT AVG(score) FROM samples")
             avg_score = cursor.fetchone()[0] or 0
 
-            return {
-                "total": total,
-                "by_type": by_type,
-                "avg_score": round(avg_score, 3)
-            }
+            return {"total": total, "by_type": by_type, "avg_score": round(avg_score, 3)}
 
 
 # ==================== CLI 接口 ====================
+
 
 def main():
     import argparse
@@ -347,17 +342,19 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     sampler = StyleSampler(config)
     logger = IndexManager(config)
     tool_name = f"style_sampler:{args.command or 'unknown'}"
 
-    def _append_timing(success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None):
+    def _append_timing(
+        success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None
+    ):
         elapsed_ms = int((time.perf_counter() - command_started_at) * 1000)
         safe_append_perf_timing(
             sampler.config.project_root,

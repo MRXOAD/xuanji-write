@@ -46,9 +46,7 @@ def test_migrate_state_to_sqlite_flow(temp_project):
                 }
             }
         },
-        "alias_index": {
-            "萧炎": [{"type": "角色", "id": "xiaoyan"}]
-        },
+        "alias_index": {"萧炎": [{"type": "角色", "id": "xiaoyan"}]},
         "state_changes": [
             {"entity_id": "xiaoyan", "field": "realm", "old": "斗者", "new": "斗师", "reason": "突破", "chapter": 2}
         ],
@@ -136,6 +134,7 @@ def test_migrate_state_cli_main(tmp_path, monkeypatch, capsys):
     migrate_module.main()
     output = json.loads(capsys.readouterr().out or "{}")
     assert output.get("status") == "success"
+
 
 def test_migrate_state_backup_and_skips(temp_project):
     state = {

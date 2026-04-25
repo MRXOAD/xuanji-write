@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
@@ -44,9 +43,7 @@ class IndexReadingMixin:
         """获取章节追读力元数据"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM chapter_reading_power WHERE chapter = ?", (chapter,)
-            )
+            cursor.execute("SELECT * FROM chapter_reading_power WHERE chapter = ?", (chapter,))
             row = cursor.fetchone()
             if row:
                 return self._row_to_dict(
@@ -329,8 +326,7 @@ class IndexReadingMixin:
                 (limit,),
             )
             return [
-                self._row_to_dict(row, parse_json=["score_breakdown", "pending_items"])
-                for row in cursor.fetchall()
+                self._row_to_dict(row, parse_json=["score_breakdown", "pending_items"]) for row in cursor.fetchall()
             ]
 
     def get_writing_checklist_score_trend(self, last_n: int = 10) -> Dict[str, Any]:
@@ -379,4 +375,3 @@ class IndexReadingMixin:
                 for row in records
             ],
         }
-

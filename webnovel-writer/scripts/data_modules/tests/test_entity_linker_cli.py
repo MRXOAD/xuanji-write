@@ -15,6 +15,7 @@ from data_modules.index_manager import IndexManager, EntityMeta
 @pytest.fixture
 def temp_project(tmp_path):
     from data_modules.config import DataModulesConfig
+
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
     return cfg

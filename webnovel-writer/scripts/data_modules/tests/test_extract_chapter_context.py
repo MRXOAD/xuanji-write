@@ -177,7 +177,10 @@ def test_render_text_contains_writing_guidance_section(tmp_path):
         "state_summary": "状态",
         "context_contract_version": "v2",
         "context_weight_stage": "early",
-        "reader_signal": {"review_trend": {"overall_avg": 72}, "low_score_ranges": [{"start_chapter": 8, "end_chapter": 9}]},
+        "reader_signal": {
+            "review_trend": {"overall_avg": 72},
+            "low_score_ranges": [{"start_chapter": 8, "end_chapter": 9}],
+        },
         "genre_profile": {
             "genre": "xuanhuan",
             "genres": ["xuanhuan", "realistic"],

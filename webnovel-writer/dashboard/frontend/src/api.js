@@ -10,8 +10,38 @@ export async function fetchJSON(path, params = {}) {
         if (v !== undefined && v !== null) url.searchParams.set(k, v);
     });
     const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `${res.status} ${res.statusText}`);
+    }
     return res.json();
+}
+
+export async function postJSON(path, payload = {}) {
+    const res = await fetch(new URL(path, window.location.origin).toString(), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    let data = null;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        data = null;
+    }
+
+    if (!res.ok) {
+        const detail = data?.detail
+        if (typeof detail === 'string' && detail) throw new Error(detail)
+        if (detail && typeof detail === 'object') throw new Error(JSON.stringify(detail, null, 2))
+        throw new Error(text || `${res.status} ${res.statusText}`)
+    }
+
+    return data
 }
 
 /**

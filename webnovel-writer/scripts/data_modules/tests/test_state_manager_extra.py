@@ -6,8 +6,6 @@ StateManager extra tests
 
 import json
 import sys
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -18,6 +16,7 @@ from data_modules.index_manager import IndexManager, EntityMeta
 @pytest.fixture
 def temp_project(tmp_path):
     from data_modules.config import DataModulesConfig
+
     cfg = DataModulesConfig.from_project_root(tmp_path)
     cfg.ensure_dirs()
     return cfg
@@ -26,9 +25,7 @@ def temp_project(tmp_path):
 def test_ensure_state_schema_and_progress(temp_project):
     # relationships as list should be migrated to structured_relationships
     state = {
-        "relationships": [
-            {"from_entity": "a", "to_entity": "b", "type": "师徒", "chapter": 1}
-        ],
+        "relationships": [{"from_entity": "a", "to_entity": "b", "type": "师徒", "chapter": 1}],
         "progress": {"current_chapter": "2", "total_words": "10"},
     }
     temp_project.state_file.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -171,9 +168,7 @@ def test_process_chapter_result_and_sqlite_sync(temp_project):
     manager.add_entity(EntityState(id="xiaoyan", name="萧炎", type="角色", tier="核心"))
 
     result = {
-        "entities_appeared": [
-            {"id": "xiaoyan", "type": "角色", "mentions": ["萧炎"], "confidence": 0.9}
-        ],
+        "entities_appeared": [{"id": "xiaoyan", "type": "角色", "mentions": ["萧炎"], "confidence": 0.9}],
         "entities_new": [
             {
                 "suggested_id": "yaolao",
@@ -184,12 +179,8 @@ def test_process_chapter_result_and_sqlite_sync(temp_project):
                 "aliases": ["药老先生"],
             }
         ],
-        "state_changes": [
-            {"entity_id": "xiaoyan", "field": "realm", "old": "斗者", "new": "斗师", "reason": "突破"}
-        ],
-        "relationships_new": [
-            {"from": "xiaoyan", "to": "yaolao", "type": "师徒", "description": "收徒"}
-        ],
+        "state_changes": [{"entity_id": "xiaoyan", "field": "realm", "old": "斗者", "new": "斗师", "reason": "突破"}],
+        "relationships_new": [{"from": "xiaoyan", "to": "yaolao", "type": "师徒", "description": "收徒"}],
         "uncertain": [
             {"mention": "宗主", "candidates": ["zongzhu", "lintian"], "suggested": "zongzhu", "confidence": 0.2},
             {
@@ -319,12 +310,14 @@ def test_ensure_state_schema_invalid_inputs(temp_project):
     schema = manager._ensure_state_schema("bad")
     assert isinstance(schema, dict)
 
-    schema2 = manager._ensure_state_schema({
-        "progress": "bad",
-        "relationships": "bad",
-        "disambiguation_warnings": "bad",
-        "disambiguation_pending": "bad",
-    })
+    schema2 = manager._ensure_state_schema(
+        {
+            "progress": "bad",
+            "relationships": "bad",
+            "disambiguation_warnings": "bad",
+            "disambiguation_pending": "bad",
+        }
+    )
     assert isinstance(schema2["progress"], dict)
     assert isinstance(schema2["relationships"], dict)
     assert isinstance(schema2["disambiguation_warnings"], list)
@@ -524,25 +517,31 @@ def test_state_manager_cli_commands(temp_project, monkeypatch, capsys):
     assert out["status"] == "success"
     assert out["data"].get("id") == "xiaoyan"
 
-    out = run_cli(["state_manager", "--project-root", str(temp_project.project_root), "list-entities", "--type", "角色"])
+    out = run_cli(
+        ["state_manager", "--project-root", str(temp_project.project_root), "list-entities", "--type", "角色"]
+    )
     assert out["status"] == "success"
     assert any(e.get("id") == "xiaoyan" for e in out.get("data", []))
 
-    out = run_cli(["state_manager", "--project-root", str(temp_project.project_root), "list-entities", "--tier", "核心"])
+    out = run_cli(
+        ["state_manager", "--project-root", str(temp_project.project_root), "list-entities", "--tier", "核心"]
+    )
     assert out["status"] == "success"
     assert any(e.get("id") == "xiaoyan" for e in out.get("data", []))
 
     payload = json.dumps({"entities_appeared": [], "entities_new": [], "state_changes": [], "relationships_new": []})
-    out = run_cli([
-        "state_manager",
-        "--project-root",
-        str(temp_project.project_root),
-        "process-chapter",
-        "--chapter",
-        "1",
-        "--data",
-        payload,
-    ])
+    out = run_cli(
+        [
+            "state_manager",
+            "--project-root",
+            str(temp_project.project_root),
+            "process-chapter",
+            "--chapter",
+            "1",
+            "--data",
+            payload,
+        ]
+    )
     assert out["status"] == "success"
 
 

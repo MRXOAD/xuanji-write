@@ -6,6 +6,7 @@ IndexEntityMixin extracted from IndexManager.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -32,9 +33,7 @@ class IndexEntityMixin:
             cursor = conn.cursor()
 
             # 检查是否存在
-            cursor.execute(
-                "SELECT id, current_json FROM entities WHERE id = ?", (entity.id,)
-            )
+            cursor.execute("SELECT id, current_json FROM entities WHERE id = ?", (entity.id,))
             existing = cursor.fetchone()
 
             if existing:
@@ -131,9 +130,7 @@ class IndexEntityMixin:
                 return self._row_to_dict(row, parse_json=["current_json"])
             return None
 
-    def get_entities_by_type(
-        self, entity_type: str, include_archived: bool = False
-    ) -> List[Dict]:
+    def get_entities_by_type(self, entity_type: str, include_archived: bool = False) -> List[Dict]:
         """按类型获取实体"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
@@ -153,10 +150,7 @@ class IndexEntityMixin:
                 """,
                     (entity_type,),
                 )
-            return [
-                self._row_to_dict(row, parse_json=["current_json"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["current_json"]) for row in cursor.fetchall()]
 
     def get_entities_by_tier(self, tier: str) -> List[Dict]:
         """按重要度获取实体 (核心/重要/次要/装饰)"""
@@ -169,10 +163,7 @@ class IndexEntityMixin:
             """,
                 (tier,),
             )
-            return [
-                self._row_to_dict(row, parse_json=["current_json"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["current_json"]) for row in cursor.fetchall()]
 
     def get_core_entities(self) -> List[Dict]:
         """获取所有核心实体 (用于 Context Agent 全量加载)"""
@@ -183,10 +174,7 @@ class IndexEntityMixin:
                 WHERE (tier IN ('核心', '重要') OR is_protagonist = 1) AND is_archived = 0
                 ORDER BY is_protagonist DESC, tier, last_appearance DESC
             """)
-            return [
-                self._row_to_dict(row, parse_json=["current_json"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["current_json"]) for row in cursor.fetchall()]
 
     def get_protagonist(self) -> Optional[Dict]:
         """获取主角实体"""
@@ -207,9 +195,7 @@ class IndexEntityMixin:
         with self._get_conn() as conn:
             cursor = conn.cursor()
 
-            cursor.execute(
-                "SELECT current_json FROM entities WHERE id = ?", (entity_id,)
-            )
+            cursor.execute("SELECT current_json FROM entities WHERE id = ?", (entity_id,))
             row = cursor.fetchone()
             if not row:
                 return False
@@ -292,18 +278,13 @@ class IndexEntityMixin:
             """,
                 (alias,),
             )
-            return [
-                self._row_to_dict(row, parse_json=["current_json"])
-                for row in cursor.fetchall()
-            ]
+            return [self._row_to_dict(row, parse_json=["current_json"]) for row in cursor.fetchall()]
 
     def get_entity_aliases(self, entity_id: str) -> List[str]:
         """获取实体的所有别名"""
         with self._get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT alias FROM aliases WHERE entity_id = ?", (entity_id,)
-            )
+            cursor.execute("SELECT alias FROM aliases WHERE entity_id = ?", (entity_id,))
             return [row["alias"] for row in cursor.fetchall()]
 
     def remove_alias(self, alias: str, entity_id: str) -> bool:
@@ -440,9 +421,7 @@ class IndexEntityMixin:
                 conn.commit()
                 return True
 
-    def get_entity_relationships(
-        self, entity_id: str, direction: str = "both"
-    ) -> List[Dict]:
+    def get_entity_relationships(self, entity_id: str, direction: str = "both") -> List[Dict]:
         """
         获取实体的关系
 
@@ -650,9 +629,7 @@ class IndexEntityMixin:
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """查询两个实体之间的关系时间线。"""
-        clauses = [
-            "((from_entity = ? AND to_entity = ?) OR (from_entity = ? AND to_entity = ?))"
-        ]
+        clauses = ["((from_entity = ? AND to_entity = ?) OR (from_entity = ? AND to_entity = ?))"]
         params: List[Any] = [entity1, entity2, entity2, entity1]
 
         if from_chapter is not None:
@@ -732,7 +709,7 @@ class IndexEntityMixin:
                 f"""
                 SELECT *
                 FROM relationship_events
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 ORDER BY chapter DESC, id DESC
             """,
                 tuple(params),
@@ -750,7 +727,7 @@ class IndexEntityMixin:
                 f"""
                 SELECT from_entity, to_entity, type, description, chapter
                 FROM relationships
-                WHERE {' AND '.join(snapshot_clauses)}
+                WHERE {" AND ".join(snapshot_clauses)}
                 ORDER BY chapter DESC, id DESC
             """,
                 tuple(snapshot_params),
@@ -925,12 +902,14 @@ class IndexEntityMixin:
         }
 
     def _sanitize_mermaid_node_id(self, raw_id: str) -> str:
-        safe = re.sub(r"[^0-9a-zA-Z_]", "_", str(raw_id or "node"))
+        raw_text = str(raw_id or "node")
+        safe = re.sub(r"[^0-9a-zA-Z_]", "_", raw_text)
         if not safe:
             safe = "node"
         if safe[0].isdigit():
             safe = f"n_{safe}"
-        return safe
+        digest = hashlib.sha1(raw_text.encode("utf-8")).hexdigest()[:8]
+        return f"{safe}_{digest}"
 
     def render_relationship_subgraph_mermaid(self, graph: Dict[str, Any]) -> str:
         """将关系子图渲染为 Mermaid。"""
@@ -970,15 +949,12 @@ class IndexEntityMixin:
                 connector = "-.->"
             else:
                 connector = "-->"
-            lines.append(
-                f"    {node_alias[from_entity]} {connector}|{label}| {node_alias[to_entity]}"
-            )
+            lines.append(f"    {node_alias[from_entity]} {connector}|{label}| {node_alias[to_entity]}")
 
         lines.append("```")
         return "\n".join(lines)
 
     # ==================== v5.3 Override Contract 操作 ====================
-
 
     def update_entity_field(self, entity_id: str, field: str, value: Any) -> bool:
         """Compatibility helper to update a single entity field in current_json."""

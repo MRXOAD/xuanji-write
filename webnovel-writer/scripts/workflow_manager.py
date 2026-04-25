@@ -520,7 +520,12 @@ def analyze_recovery_options(interrupt_info):
                 "label": "删除润色稿，从 Step 2A 重写",
                 "risk": "medium",
                 "description": f"删除 {chapter_path} 并重新生成章节内容",
-                "actions": [f"删除 {chapter_path}", "清理 Git 暂存区", "清理中断状态", f"执行 /{command} {chapter_num}"],
+                "actions": [
+                    f"删除 {chapter_path}",
+                    "清理 Git 暂存区",
+                    "清理中断状态",
+                    f"执行 /{command} {chapter_num}",
+                ],
             },
         ]
 

@@ -81,4 +81,4 @@
 - tool_call_stats
 - writing_checklist_scores
 
-> 实际字段与约束以 `.claude/scripts/data_modules/index_manager.py` 为准。
+> 实际字段与约束以 `webnovel-writer/scripts/data_modules/index_manager.py` 为准。
