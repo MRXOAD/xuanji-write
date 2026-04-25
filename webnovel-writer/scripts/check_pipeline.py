@@ -61,15 +61,17 @@ def run_l2(project_root: Path, chapter: int) -> dict:
         from llm_adapter import _call_llm
 
         config = DataModulesConfig.from_project_root(project_root)
+        view = config.role_view("monitoring")
         resp = _call_llm(
             config,
             messages=[
                 {"role": "system", "content": "你是网文编辑,只输出严格 JSON。"},
                 {"role": "user", "content": prompt},
             ],
-            model=config.llm_chat_model,
+            model=view.chat_model or config.llm_chat_model,
             temperature=0.2,
             max_tokens=1500,
+            role="monitoring",
         )
     except Exception as exc:
         return {"chapter": chapter, "level": "L2", "verdict": "ERROR", "error": str(exc)}
@@ -108,15 +110,17 @@ def run_l3(project_root: Path, chapter: int) -> dict:
         from llm_adapter import _call_llm
 
         config = DataModulesConfig.from_project_root(project_root)
+        view = config.role_view("monitoring")
         resp = _call_llm(
             config,
             messages=[
                 {"role": "system", "content": "你是网文连载编辑,只输出严格 JSON。"},
                 {"role": "user", "content": prompt},
             ],
-            model=config.llm_reasoning_model or config.llm_chat_model,
+            model=view.reasoning_model or config.llm_reasoning_model or config.llm_chat_model,
             temperature=0.2,
             max_tokens=2000,
+            role="monitoring",
         )
     except Exception as exc:
         return {"chapter": chapter, "level": "L3", "verdict": "ERROR", "error": str(exc)}

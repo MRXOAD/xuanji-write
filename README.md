@@ -46,7 +46,7 @@ python -m pip install -r requirements.txt
 
 ## 配 LLM
 
-`.env` 最小配置:
+`.env` 最小配置(写正文):
 
 ```bash
 LLM_PROVIDER=openai_compatible
@@ -56,7 +56,16 @@ LLM_REASONING_MODEL=deepseek-reasoner
 DEEPSEEK_API_KEY=sk-xxx
 ```
 
-支持网关回退、ModelScope embedding、Jina rerank。详见 [`docs/codex-llm.md`](docs/codex-llm.md)。
+**写作 / 监控分两套 API**(可选)。监控指伏笔抽取 / L2 章级 fact-check / L3 段级 review,这些任务跑频率高,可以挂便宜小模型省钱。`.env` 加一段:
+
+```bash
+# 例:写作 deepseek-chat($0.27/M), 监控 qwen-turbo($0.04/M)
+MONITORING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MONITORING_CHAT_MODEL=qwen-turbo-latest
+MONITORING_API_KEY=sk-xxx
+```
+
+不配 `MONITORING_*` 就两边共用 writing 那套。支持网关回退、ModelScope embedding、Jina rerank。详见 [`docs/codex-llm.md`](docs/codex-llm.md)。
 
 ## 写第一本书
 

@@ -84,14 +84,30 @@ def _is_deepseek_model(model: str) -> bool:
     return str(model or "").strip() in {"deepseek-chat", "deepseek-reasoner"}
 
 
-def _build_llm_routes(config: DataModulesConfig, model: str) -> list[dict[str, str]]:
+def _build_llm_routes(
+    config: DataModulesConfig,
+    model: str,
+    *,
+    role: str = "writing",
+) -> list[dict[str, str]]:
+    """构造 LLM 调用路由表。
+
+    role:
+    - "writing"(默认): 写正文 / 章末 review。沿用 llm_* 配置 + deepseek 官方 fallback。
+    - "monitoring": 伏笔抽取 / L2 / L3 检查。优先 monitoring_* 配置,缺项 fallback 到 writing。
+
+    deepseek 官方路由仍只在 writing role 加(避免监控路由被串到 deepseek)。
+    """
     routes: list[dict[str, str]] = []
+
+    role_view = config.role_view(role) if hasattr(config, "role_view") else None
 
     official_api_key = str(getattr(config, "deepseek_official_api_key", "") or "").strip()
     official_base_url = (
         str(getattr(config, "deepseek_official_base_url", "") or "").strip() or "https://api.deepseek.com"
     )
-    if _is_deepseek_model(model) and official_api_key:
+    # deepseek 官方路由只给 writing 用(monitoring 显式配置时不混进来)
+    if role != "monitoring" and _is_deepseek_model(model) and official_api_key:
         routes.append(
             {
                 "name": "deepseek_official",
@@ -101,16 +117,24 @@ def _build_llm_routes(config: DataModulesConfig, model: str) -> list[dict[str, s
             }
         )
 
-    configured_base_url = str(config.llm_base_url or "").strip()
-    if configured_base_url:
+    if role_view is not None:
+        configured_base_url = (role_view.base_url or "").strip()
+        configured_api_key = (role_view.api_key or "").strip()
+        configured_gateway_token = (role_view.gateway_token or "").strip()
+        route_name = role_view.role
+    else:
+        configured_base_url = str(config.llm_base_url or "").strip()
         configured_api_key = str(config.llm_api_key or "").strip()
         configured_gateway_token = str(getattr(config, "llm_gateway_token", "") or "").strip()
+        route_name = "configured"
+
+    if configured_base_url:
         if _is_official_deepseek_base_url(configured_base_url) and not configured_api_key:
             configured_api_key = official_api_key
         if not (_is_gateway_base_url(configured_base_url) and not configured_gateway_token):
             routes.append(
                 {
-                    "name": "configured",
+                    "name": route_name,
                     "base_url": configured_base_url,
                     "api_key": configured_api_key,
                     "gateway_token": configured_gateway_token,
@@ -285,14 +309,20 @@ def _call_llm(
     model: str,
     temperature: float,
     max_tokens: int,
+    role: str = "writing",
 ) -> str:
     provider = str(config.llm_provider or "").strip() or "openai_compatible"
     if provider != "openai_compatible":
         raise RuntimeError(f"暂不支持的 LLM_PROVIDER: {provider}")
     if not str(model or "").strip():
         raise RuntimeError("缺少可用模型名，请配置 LLM_CHAT_MODEL 或 LLM_REASONING_MODEL")
-    routes = _build_llm_routes(config, model)
+    routes = _build_llm_routes(config, model, role=role)
     if not routes:
+        if role == "monitoring":
+            raise RuntimeError(
+                "缺少可用监控 LLM 路由,请配置 MONITORING_BASE_URL/MONITORING_API_KEY,"
+                "或保证写作 LLM_* 配置可用作为 fallback"
+            )
         if _is_deepseek_model(model):
             raise RuntimeError("缺少可用 DeepSeek 路由，请配置 DEEPSEEK_API_KEY，或补齐 LLM_BASE_URL 与对应鉴权")
         raise RuntimeError("缺少可用 LLM 路由，请补齐 LLM_BASE_URL 与对应鉴权")

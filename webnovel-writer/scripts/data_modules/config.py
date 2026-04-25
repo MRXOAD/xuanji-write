@@ -498,6 +498,55 @@ class DataModulesConfig:
             default=4096,
         )
 
+        # Monitoring role:伏笔抽取 / L2 / L3 这些"读后审查"任务可以分流到独立 API
+        # 全部可选;留空则 fallback 到上面的 llm_* 配置
+        self.monitoring_base_url = _read_setting_from_sources(
+            self.project_root,
+            ("MONITORING_BASE_URL", "LLM_MONITORING_BASE_URL"),
+            default="",
+        )
+        self.monitoring_chat_model = _read_setting_from_sources(
+            self.project_root,
+            ("MONITORING_CHAT_MODEL", "LLM_MONITORING_CHAT_MODEL", "MONITORING_MODEL"),
+            default="",
+        )
+        self.monitoring_reasoning_model = _read_setting_from_sources(
+            self.project_root,
+            ("MONITORING_REASONING_MODEL", "LLM_MONITORING_REASONING_MODEL"),
+            default="",
+        )
+        self.monitoring_api_key = _read_setting_from_sources(
+            self.project_root,
+            ("MONITORING_API_KEY", "LLM_MONITORING_API_KEY"),
+            default="",
+        )
+        self.monitoring_gateway_token = _read_setting_from_sources(
+            self.project_root,
+            ("MONITORING_GATEWAY_TOKEN", "LLM_MONITORING_GATEWAY_TOKEN"),
+            default="",
+        )
+        self.monitoring_temperature = _read_float_setting(
+            self.project_root,
+            ("MONITORING_TEMPERATURE", "LLM_MONITORING_TEMPERATURE"),
+            default=0.2,
+        )
+        self.monitoring_max_tokens = _read_int_setting(
+            self.project_root,
+            ("MONITORING_MAX_TOKENS", "LLM_MONITORING_MAX_TOKENS"),
+            default=2000,
+        )
+
+    def role_view(self, role: str) -> "RoleView":
+        """根据 role 返回 base_url / api_key / model 等的视图。
+
+        role 取值:
+        - "writing"(默认): 写正文。用 llm_* 配置,deepseek 模型时叠加官方路由 fallback
+        - "monitoring": 审查 / 伏笔 / 检查。用 monitoring_* 配置,缺项 fallback 到 llm_*
+
+        视图是只读的 dataclass-like 对象,字段稳定,llm_adapter 用它构 routes。
+        """
+        return RoleView.from_config(self, role)
+
     @property
     def deepseek_base_url(self) -> str:
         return self.llm_base_url
@@ -536,6 +585,71 @@ class DataModulesConfig:
         # 在构造配置前加载项目级 `.env`，以确保 EMBED_*/RERANK_* 等字段可生效
         _load_project_dotenv(root)
         return cls(project_root=root)
+
+
+@dataclass(frozen=True)
+class RoleView:
+    """LLM role 配置视图,只读。
+
+    用 DataModulesConfig.role_view("writing"|"monitoring") 取。
+    llm_adapter._build_llm_routes 接受这个对象,根据它构 routes。
+    """
+
+    role: str
+    base_url: str
+    api_key: str
+    chat_model: str
+    reasoning_model: str
+    gateway_token: str
+    temperature: float
+    max_tokens: int
+
+    @classmethod
+    def from_config(cls, config: "DataModulesConfig", role: str) -> "RoleView":
+        role = (role or "writing").strip().lower()
+        if role == "monitoring":
+            base_url = (config.monitoring_base_url or config.llm_base_url or "").strip()
+            api_key = (config.monitoring_api_key or config.llm_api_key or "").strip()
+            chat_model = (config.monitoring_chat_model or config.llm_chat_model or "").strip()
+            reasoning_model = (
+                config.monitoring_reasoning_model
+                or config.monitoring_chat_model
+                or config.llm_reasoning_model
+                or config.llm_chat_model
+                or ""
+            ).strip()
+            gateway_token = (config.monitoring_gateway_token or getattr(config, "llm_gateway_token", "") or "").strip()
+            temperature = float(config.monitoring_temperature or 0.2)
+            max_tokens = int(config.monitoring_max_tokens or 2000)
+        else:
+            base_url = (config.llm_base_url or "").strip()
+            api_key = (config.llm_api_key or "").strip()
+            chat_model = (config.llm_chat_model or "").strip()
+            reasoning_model = (config.llm_reasoning_model or chat_model or "").strip()
+            gateway_token = str(getattr(config, "llm_gateway_token", "") or "").strip()
+            temperature = float(config.llm_temperature)
+            max_tokens = int(config.llm_max_tokens)
+            role = "writing"
+        return cls(
+            role=role,
+            base_url=base_url,
+            api_key=api_key,
+            chat_model=chat_model,
+            reasoning_model=reasoning_model,
+            gateway_token=gateway_token,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+    def has_dedicated_config(self, config: "DataModulesConfig") -> bool:
+        """监控角色是否真的配了独立 API(还是 fallback 到 writing)"""
+        if self.role != "monitoring":
+            return False
+        return bool(
+            (config.monitoring_base_url or "").strip()
+            or (config.monitoring_api_key or "").strip()
+            or (config.monitoring_chat_model or "").strip()
+        )
 
 
 _default_config: Optional[DataModulesConfig] = None

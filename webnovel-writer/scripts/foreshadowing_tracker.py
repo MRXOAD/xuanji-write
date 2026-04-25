@@ -67,15 +67,18 @@ def extract_via_llm(project_root: Path, chapter_num: int) -> dict | None:
         from llm_adapter import _call_llm
 
         config = DataModulesConfig.from_project_root(project_root)
+        # 监控角色:伏笔抽取走 monitoring API(没配则 fallback 到 writing)
+        view = config.role_view("monitoring")
         resp = _call_llm(
             config,
             messages=[
                 {"role": "system", "content": "你是网文编辑,只输出严格 JSON,不要解释。"},
                 {"role": "user", "content": prompt},
             ],
-            model=config.llm_chat_model,
+            model=view.chat_model or config.llm_chat_model,
             temperature=0.3,
             max_tokens=1500,
+            role="monitoring",
         )
     except Exception as exc:
         print(f"⚠️ LLM 调用失败: {exc}", file=sys.stderr)
