@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml/badge.svg)](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml)
 
 中文长篇网文连续生成框架。这本书已经写到 300 章 / 106.7 万字,deepseek-chat 单章 28 秒。
 

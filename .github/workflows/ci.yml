@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        # 关掉覆盖率门槛(本地通常装了 .coveragerc, CI 跑只验功能)
+        run: |
+          pytest webnovel-writer/scripts/data_modules/tests/ \
+            --no-cov \
+            -q --no-header
+
+  frontend-build:
+    name: frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: webnovel-writer/dashboard/frontend/package-lock.json
+
+      - name: Install
+        working-directory: webnovel-writer/dashboard/frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: webnovel-writer/dashboard/frontend
+        run: npm run build
+
+      - name: Audit (warn only, 不阻断)
+        working-directory: webnovel-writer/dashboard/frontend
+        run: npm audit --audit-level=high || true
