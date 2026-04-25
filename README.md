@@ -5,7 +5,7 @@
 [![CI](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml/badge.svg)](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/MRXOAD/xuanji-write?label=Release)](https://github.com/MRXOAD/xuanji-write/releases)
 
-中文长篇网文 LLM 续写框架。一本《香灰照骨》已经写到 300 章 / 106.7 万字。单章 28 秒,deepseek-chat 单章 $0.003-$0.01。
+中文长篇网文 LLM 续写框架。单章 28 秒,deepseek-chat 单章 $0.003-$0.01。
 
 ![dashboard](docs/img/dashboard-react-full.png)
 
@@ -51,11 +51,10 @@ docker-compose up
 
 | 指标 | 数 |
 |---|---|
-| 已写 | 300 章 / 106.7 万字 |
 | 单章生成 | 28 秒 (deepseek-chat) |
 | 单章成本 | $0.003 - $0.01 |
-| 全本审查 | 0.3 秒 (300 章 × 7 类正则) |
-| 一次跑 69 章失败章节 | 2 章(都是 API 断流,重跑成功) |
+| 全本审查 | 0.3 秒/章 × 7 类正则 |
+| 一次 batch 69 章失败 | 2 章(都是 API 断流,重跑成功) |
 | 单元测试 | 225 个,GitHub Actions Python 3.10 / 3.12 矩阵 |
 
 ## 11 层一致性堵漏
