@@ -39,8 +39,9 @@ Streamlit vibe(进度面板):
 | token / cost 自动统计 | ✓ | ✗ | ✗ | ✗ |
 | 角色对白历史样本注入 | ✓ | ✗ | character_state | ✗ |
 | 伏笔自动追踪 | ✓ | ✗ | ✗ | propagation debt |
-| 长程上下文混合(5 类来源) | ✓ | ✓ | ✗ | ✓ |
-| Story System 主合约 | ✗(待补) | ✓ | ✗ | 五层共演化 |
+| 长程上下文混合(5 类来源 + 卷头 transition) | ✓ | ✓ | ✗ | ✓ |
+| Story System 主合约 | ✓(`设定集/故事合约.md`) | ✓ | ✗ | 五层共演化 |
+| RAG 反向检索防桥段复读 | ✓ | ✗ | ✗ | ✗ |
 | 多 agent 协作 | ✗ | ✗ | ✗ | ✓ |
 
 ## 装
@@ -49,6 +50,16 @@ Streamlit vibe(进度面板):
 git clone https://github.com/MRXOAD/xuanji-write.git
 cd xuanji-write
 python -m pip install -r requirements.txt
+```
+
+或者用 Docker 一键起 fastapi 后端 + streamlit vibe 面板:
+
+```bash
+cp .env.docker.example .env  # 填 DEEPSEEK_API_KEY
+mkdir -p books && cp -r examples/demo-都市悬疑 books/default
+docker-compose up
+# Streamlit:  http://localhost:8866
+# FastAPI:    http://localhost:8000
 ```
 
 ## 配 LLM

@@ -387,6 +387,8 @@ def test_cmd_draft_reuses_existing_chapter_and_syncs_outputs(tmp_path, monkeypat
         overwrite=True,
         stdout_only=False,
         use_volume_layout=False,
+        no_preflight=True,
+        preflight_strict=False,
     )
 
     assert module.cmd_draft(args) == 0
@@ -434,6 +436,8 @@ def test_cmd_write_errors_when_outline_missing(tmp_path, monkeypatch):
         overwrite=True,
         stdout_only=False,
         use_volume_layout=False,
+        no_preflight=True,
+        preflight_strict=False,
     )
 
     with pytest.raises(ValueError, match="缺少可用大纲"):
@@ -531,6 +535,8 @@ def test_cmd_write_updates_total_words_for_output_outside_project_root(tmp_path,
         overwrite=True,
         stdout_only=False,
         use_volume_layout=False,
+        no_preflight=True,
+        preflight_strict=False,
     )
 
     assert module.cmd_draft(args) == 0

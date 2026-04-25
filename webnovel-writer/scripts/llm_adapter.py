@@ -1553,6 +1553,73 @@ def _sync_written_chapter_impl(
         except Exception as exc:
             print(f"⚠️ foreshadowing 自动追踪失败(已忽略): {exc}", file=sys.stderr)
 
+    # 自动跑 L2 / L3 检查:WEBNOVEL_AUTO_CHECK=L2 (默认) / L3 / off
+    # L2 是每章 % 10 == 0 跑(段尾), L3 是每章 % 80 == 0 跑(卷尾),由 check_pipeline._decide_level 决定
+    auto_check = (os.environ.get("WEBNOVEL_AUTO_CHECK", "L2") or "").upper().strip()
+    if auto_check in ("L2", "L3"):
+        try:
+            from check_pipeline import _decide_level, run_l2, run_l3
+
+            level = _decide_level(chapter_num)
+            should_run = (level == "L2") or (level == "L3" and auto_check == "L3")
+            if should_run:
+                check_result: dict = {}
+                if level == "L2":
+                    check_result = run_l2(project_root, chapter_num)
+                elif level == "L3":
+                    check_result = run_l3(project_root, chapter_num)
+                if check_result:
+                    verdict = check_result.get("verdict", "?")
+                    issues = check_result.get("issues", []) or []
+                    if verdict in ("FAIL", "WARN") or issues:
+                        # 落盘到审查报告/
+                        report_dir = project_root / "审查报告"
+                        if not report_dir.is_dir():
+                            report_dir = project_root / ".webnovel" / "reviews"
+                            report_dir.mkdir(parents=True, exist_ok=True)
+                        report_path = report_dir / f"ch{chapter_num:04d}.{level.lower()}-auto.json"
+                        report_path.write_text(
+                            json.dumps(check_result, ensure_ascii=False, indent=2),
+                            encoding="utf-8",
+                        )
+                        print(
+                            f"⚙️  ch{chapter_num:04d} {level} verdict={verdict} 共 {len(issues)} issue → {report_path.name}",
+                            file=sys.stderr,
+                        )
+                    else:
+                        print(f"⚙️  ch{chapter_num:04d} {level} PASS", file=sys.stderr)
+        except Exception as exc:
+            print(f"⚠️ {auto_check} 自动检查失败(已忽略): {exc}", file=sys.stderr)
+
+    # 角色对白样本自动刷新:每 N 章(默认 30)触发一次
+    # WEBNOVEL_VOICE_AUTO=0 关闭, WEBNOVEL_VOICE_INTERVAL=N 改间隔
+    voice_auto = os.environ.get("WEBNOVEL_VOICE_AUTO", "1") != "0"
+    try:
+        voice_interval = int(os.environ.get("WEBNOVEL_VOICE_INTERVAL", "30"))
+    except ValueError:
+        voice_interval = 30
+    if voice_auto and voice_interval > 0 and chapter_num > 0 and chapter_num % voice_interval == 0:
+        try:
+            script = Path(__file__).resolve().parent / "extract_character_voice.py"
+            if script.exists():
+                import subprocess
+
+                proc = subprocess.run(
+                    [sys.executable, str(script), "--project-root", str(project_root)],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                if proc.returncode == 0:
+                    print(f"🎙️  ch{chapter_num:04d} 角色对白样本已自动刷新", file=sys.stderr)
+                else:
+                    print(
+                        f"⚠️ extract_character_voice 退出码 {proc.returncode}: {proc.stderr.strip()[:200]}",
+                        file=sys.stderr,
+                    )
+        except Exception as exc:
+            print(f"⚠️ 角色对白样本自动刷新失败(已忽略): {exc}", file=sys.stderr)
+
     return {
         "summary_path": summary_path,
         "current_chapter": current_chapter,
@@ -1901,8 +1968,31 @@ def cmd_prompt(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_preflight_or_warn(project_root: Path, chapter: int, *, strict: bool = False) -> None:
+    """跑 preflight 检查,error 抛 ValueError 阻断写章; warning 只 stderr 不阻断。"""
+    try:
+        from preflight import run_preflight
+    except Exception as exc:
+        print(f"⚠️ 预检模块加载失败,跳过预检: {exc}", file=sys.stderr)
+        return
+    report = run_preflight(project_root, chapter)
+    for msg in report.get("warnings") or []:
+        print(f"⚠️  ch{chapter:04d} 预检警告: {msg}", file=sys.stderr)
+    errs = report.get("errors") or []
+    if errs:
+        joined = "\n".join(f"  - {e}" for e in errs)
+        raise ValueError(f"第 {chapter} 章预检不通过(--no-preflight 关闭):\n{joined}")
+    if strict and (report.get("warnings") or []):
+        raise ValueError(f"第 {chapter} 章预检 strict 模式下仍有 warning,停止")
+
+
 def cmd_draft(args: argparse.Namespace) -> int:
     project_root = find_project_root(Path(args.project_root)) if args.project_root else find_project_root()
+
+    # 写章前预检(可用 --no-preflight 关)
+    if not getattr(args, "no_preflight", False):
+        _run_preflight_or_warn(project_root, args.chapter, strict=bool(getattr(args, "preflight_strict", False)))
+
     config = DataModulesConfig.from_project_root(project_root)
     payload = build_chapter_context_payload(project_root, args.chapter)
     _ensure_write_outline(payload, args.chapter)
@@ -2069,6 +2159,15 @@ def cmd_batch_draft(args: argparse.Namespace) -> int:
         overwrite=bool(args.overwrite),
         use_volume_layout=bool(args.use_volume_layout),
     )
+
+    # 批量预检:逐章跑,error 直接终止整批
+    if not getattr(args, "no_preflight", False):
+        for chapter_num in chapter_numbers:
+            _run_preflight_or_warn(
+                project_root,
+                chapter_num,
+                strict=bool(getattr(args, "preflight_strict", False)),
+            )
 
     payloads: dict[int, dict[str, Any]] = {}
     messages_by_chapter: dict[int, list[dict[str, str]]] = {}
@@ -2364,6 +2463,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_draft.add_argument("--stdout-only", action="store_true", help="只打印，不落文件")
     p_draft.add_argument("--use-volume-layout", action="store_true", help="输出到 正文/第N卷/第NNN章*.md")
     p_draft.add_argument("--no-audit-retry", action="store_true", help="audit 失败时不自动 retry")
+    p_draft.add_argument("--no-preflight", action="store_true", help="跳过写章前预检")
+    p_draft.add_argument("--preflight-strict", action="store_true", help="预检 warning 也阻断")
     p_draft.set_defaults(func=cmd_draft)
 
     p_write = sub.add_parser("write", help="兼容旧命令，等同于 draft")
@@ -2392,6 +2493,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--health-report", action="store_true", help="批量同步后刷新健康报告")
     p_batch.add_argument("--parallel", type=int, default=1, help="并发数,默认 1(串行);建议 2-4 兼顾速度和限速")
     p_batch.add_argument("--skip-on-error", action="store_true", help="单章失败不中断,跳过继续")
+    p_batch.add_argument("--no-preflight", action="store_true", help="跳过写章前预检")
+    p_batch.add_argument("--preflight-strict", action="store_true", help="预检 warning 也阻断")
     p_batch.set_defaults(func=cmd_batch_draft)
 
     p_review = sub.add_parser("review", help="调用 LLM 生成章节审查报告")

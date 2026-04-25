@@ -1,0 +1,86 @@
+# 一键起 streamlit + react + fastapi
+# 用法:
+#   1. 把书项目放到 ./books/<your_book>/
+#   2. 复制 .env.example 到当前目录 .env, 填 DEEPSEEK_API_KEY
+#   3. docker-compose up
+#   4. 访问:
+#      - Streamlit vibe panel:  http://localhost:8866
+#      - React dashboard:       http://localhost:5173 (dev) 或 http://localhost:8000 (prod)
+
+services:
+  fastapi:
+    # FastAPI 后端 + 静态托管 dist/(prod 模式)
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: xuanji-write:latest
+    container_name: xuanji-fastapi
+    working_dir: /app/webnovel-writer
+    command: >
+      python -m dashboard.server
+      --project-root /books/${BOOK:-default}
+      --port 8000
+      --host 0.0.0.0
+      --no-browser
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai_compatible}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-deepseek-chat}
+      - LLM_REASONING_MODEL=${LLM_REASONING_MODEL:-deepseek-reasoner}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - LLM_GATEWAY_TOKEN=${LLM_GATEWAY_TOKEN:-}
+      - MONITORING_BASE_URL=${MONITORING_BASE_URL:-}
+      - MONITORING_API_KEY=${MONITORING_API_KEY:-}
+      - MONITORING_CHAT_MODEL=${MONITORING_CHAT_MODEL:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./books:/books
+      - ./webnovel-writer:/app/webnovel-writer
+    restart: unless-stopped
+
+  streamlit:
+    # Streamlit "vibe" 实时面板
+    image: xuanji-write:latest
+    container_name: xuanji-streamlit
+    depends_on:
+      - fastapi
+    working_dir: /app
+    command: >
+      streamlit run webnovel-writer/dashboard_vibe.py
+      --server.port 8866
+      --server.address 0.0.0.0
+      --
+      --project-root /books/${BOOK:-default}
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai_compatible}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-deepseek-chat}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - LLM_GATEWAY_TOKEN=${LLM_GATEWAY_TOKEN:-}
+    ports:
+      - "8866:8866"
+    volumes:
+      - ./books:/books
+      - ./webnovel-writer:/app/webnovel-writer
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # React dev server (只在用 docker-compose --profile dev up 时启动)
+  # 平时不用,用户手工本地跑 npm run dev 更快
+  # ──────────────────────────────────────────
+  react-dev:
+    image: node:20-slim
+    container_name: xuanji-react-dev
+    profiles: ["dev"]
+    working_dir: /frontend
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./webnovel-writer/dashboard/frontend:/frontend
+      - /frontend/node_modules
+    depends_on:
+      - fastapi
+    environment:
+      - VITE_PROXY_TARGET=http://fastapi:8000

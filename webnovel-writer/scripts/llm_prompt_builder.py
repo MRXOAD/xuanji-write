@@ -36,6 +36,26 @@ def render_rag_hits(payload: Dict[str, Any]) -> str:
     return "\n".join(rows)
 
 
+def render_anti_repeat(payload: Dict[str, Any], threshold: float = 0.7) -> str:
+    """RAG 反向检索:把 score >= threshold 的历史段当作"已写过,本章必须避开"。
+
+    防止 300+ 章长篇里出现"桥段复读"——同样的酒馆打架、同样的废墟搜物、同样的雨夜对话。
+    """
+    rag = payload.get("rag_assist") or {}
+    hits = rag.get("hits") or []
+    if not rag.get("invoked") or not hits:
+        return ""
+    high = [h for h in hits if float(h.get("score") or 0) >= threshold]
+    if not high:
+        return ""
+    rows = []
+    for idx, row in enumerate(high[:5], start=1):
+        ch = row.get("chapter", "?")
+        snippet = str(row.get("content", "")).strip().replace("\n", " ")[:120]
+        rows.append(f"{idx}. 第{ch}章 (score={row.get('score', 0):.2f}): {snippet}")
+    return "\n".join(rows)
+
+
 def render_guidance(payload: Dict[str, Any]) -> str:
     guidance = payload.get("writing_guidance") or {}
     items = guidance.get("guidance_items") or []
@@ -55,6 +75,31 @@ def render_guidance(payload: Dict[str, Any]) -> str:
         else:
             rows.append(f"检查 {idx}: [{required}] {label}")
     return "\n".join(rows) if rows else "无"
+
+
+def load_story_contract(project_root: Optional[Path]) -> str:
+    """从 设定集/故事合约.md 加载全书故事合约(Story System)。
+
+    这是一份"宪法"文件,描述全书的:
+    - 核心冲突 / 题材合约
+    - 主角弧 / 反派弧
+    - 节奏 / 主线 / 关键转折
+
+    缺文件 = 返回空串(向后兼容存量项目)。
+    """
+    if project_root is None:
+        return ""
+    contract_file = Path(project_root) / "设定集" / "故事合约.md"
+    if not contract_file.is_file():
+        return ""
+    try:
+        text = contract_file.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    # 去掉文件头的顶级 # 标题行(避免和章节 prompt 的 # 撞),保留正文
+    lines = text.splitlines()
+    clean = [line for line in lines if not (line.startswith("# ") and not line.startswith("## "))]
+    return "\n".join(clean).strip()
 
 
 def load_character_anchors(project_root: Optional[Path]) -> list[str]:
@@ -152,7 +197,20 @@ def build_write_messages(
             rules.append(f"{start_idx + offset}. {anchor}")
     else:
         rules = list(BASE_WRITE_RULES)
-    system_prompt = "\n".join(rules)
+    base_system = "\n".join(rules)
+
+    # Story System 主合约层(可选, 缺文件不影响)
+    story_contract = load_story_contract(project_root)
+    if story_contract:
+        system_prompt = (
+            base_system
+            + "\n\n"
+            + "=== 故事合约(Story System,全书宪法,优先于一切单章细节)===\n"
+            + story_contract
+            + "\n=== 故事合约结束 ==="
+        )
+    else:
+        system_prompt = base_system
 
     # P1-A 角色言行风格库:从本章大纲匹配出场角色,各挑 4 条历史样本
     outline_text = str(payload.get("outline") or "")
@@ -179,6 +237,36 @@ def build_write_messages(
         except Exception:
             foreshadow_section = ""
 
+    # 反向检索:防桥段复读
+    anti_repeat_block = render_anti_repeat(payload, threshold=0.7)
+    anti_repeat_section = ""
+    if anti_repeat_block:
+        anti_repeat_section = (
+            "\n【⚠️ 桥段复读警报(避免重写以下已存在场景)】\n"
+            "下面这几段是 RAG 检索到的高度相似历史段。本章场景结构、桥段铺陈、"
+            "对白模式都要明显不同,不要复用同样的解决路径。\n\n"
+            f"{anti_repeat_block}\n"
+        )
+
+    # 卷头 transition 章特别注入
+    transition_section = ""
+    vt = payload.get("volume_transition") or {}
+    if vt.get("is_volume_head"):
+        vol_num = vt.get("volume_num")
+        vol_title = vt.get("volume_title") or ""
+        scaffold = vt.get("new_volume_scaffold") or ""
+        prev_tail = vt.get("prev_volume_tail_chapter")
+        block_lines = [
+            f"⚠️ 本章是第 {vol_num} 卷《{vol_title}》卷头章,需做章节情绪和节奏的转折承接:",
+            f"- 上一卷已收束在第 {prev_tail} 章,先用 1-2 段微回顾让读者过渡",
+            "- 然后正式打开新卷主题(场景 / 视角 / 时间 / 反派阵营换),不要继续上卷的小冲突",
+            "- 卷头钩子比常规章更强,留一个能拉动整卷主线的悬念",
+        ]
+        if scaffold:
+            block_lines.append("\n新卷阶段支架(参考结构,不要照抄):")
+            block_lines.append(scaffold)
+        transition_section = "\n【卷头 transition 注入】\n" + "\n".join(block_lines) + "\n"
+
     user_prompt = (
         f"请写第 {chapter_num} 章，目标篇幅约 {target_words} 字。\n\n"
         f"【本章大纲】\n{payload.get('outline', '')}\n\n"
@@ -187,7 +275,9 @@ def build_write_messages(
         f"【写作提示】\n{render_guidance(payload)}\n\n"
         f"【RAG 线索】\n{render_rag_hits(payload)}\n"
         f"{voice_section}"
-        f"{foreshadow_section}\n"
+        f"{foreshadow_section}"
+        f"{anti_repeat_section}"
+        f"{transition_section}\n"
         "输出格式：\n"
         f"# 第{chapter_num}章\n"
         "接着直接写正文。不要附加“本章完”“作者的话”“创作说明”。"

@@ -365,12 +365,95 @@ def _select_long_term_context_chapters(project_root: Path, chapter_num: int) -> 
     return sorted(selected)
 
 
+def _detect_volume_transition(project_root: Path, chapter_num: int) -> Dict[str, Any]:
+    """检测本章是不是某卷的卷头章。
+
+    返回:
+    - is_volume_head: bool
+    - volume_num: int | None    本章所在卷
+    - volume_title: str
+    - prev_volume_tail_chapter: int | None  上一卷最后一章号
+    - new_volume_scaffold: str   从 大纲/*阶段支架*.md 抽该卷段
+    """
+    info = {
+        "is_volume_head": False,
+        "volume_num": None,
+        "volume_title": "",
+        "prev_volume_tail_chapter": None,
+        "new_volume_scaffold": "",
+    }
+    state_path = project_root / ".webnovel" / "state.json"
+    if not state_path.is_file():
+        return info
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return info
+
+    progress = state.get("progress") or {}
+    vols = progress.get("volumes_planned") or []
+    for idx, v in enumerate(vols):
+        rng = str(v.get("chapters_range") or "")
+        if "-" not in rng:
+            continue
+        try:
+            a, b = rng.split("-", 1)
+            a, b = int(a), int(b)
+        except ValueError:
+            continue
+        if a == chapter_num:
+            info["is_volume_head"] = True
+            try:
+                info["volume_num"] = int(v.get("volume"))
+            except (TypeError, ValueError):
+                info["volume_num"] = None
+            info["volume_title"] = str(v.get("title") or "")
+            # 上一卷最后一章
+            if idx > 0:
+                prev_v = vols[idx - 1]
+                prev_rng = str(prev_v.get("chapters_range") or "")
+                if "-" in prev_rng:
+                    try:
+                        info["prev_volume_tail_chapter"] = int(prev_rng.split("-", 1)[1])
+                    except ValueError:
+                        pass
+            # 抓阶段支架文件里这个卷的段落
+            outline_dir = project_root / "大纲"
+            if outline_dir.is_dir():
+                for sf in sorted(outline_dir.glob("*阶段支架*.md")):
+                    try:
+                        text = sf.read_text(encoding="utf-8")
+                    except Exception:
+                        continue
+                    # 简单按"第 N 卷"定位卷头段落:抽该卷标题及之后到下个卷标题前的内容
+                    vol_num = info.get("volume_num")
+                    if vol_num is None:
+                        break
+                    pattern = re.compile(rf"#+\s*第\s*{vol_num}\s*卷[\s\S]*?(?=#+\s*第\s*{vol_num + 1}\s*卷|\Z)")
+                    m = pattern.search(text)
+                    if m:
+                        # 限制 1500 字防过长
+                        section = m.group(0).strip()
+                        info["new_volume_scaffold"] = section[:1500]
+                        break
+            break
+    return info
+
+
 def build_chapter_context_payload(project_root: Path, chapter_num: int) -> Dict[str, Any]:
     """Assemble full chapter context payload for text/json output."""
     outline = extract_chapter_outline(project_root, chapter_num)
 
+    # 卷头 transition 检测
+    volume_transition = _detect_volume_transition(project_root, chapter_num)
+
     prev_summaries = []
     selected_chapters = _select_long_term_context_chapters(project_root, chapter_num)
+    # 卷头章额外加一条:上卷尾章摘要(强制纳入)
+    if volume_transition.get("is_volume_head"):
+        prev_tail = volume_transition.get("prev_volume_tail_chapter")
+        if prev_tail and prev_tail not in selected_chapters:
+            selected_chapters = sorted(list(selected_chapters) + [prev_tail])
     # 限制最多 5 章,避免 prompt 过长
     if len(selected_chapters) > 5:
         # 优先保留近 2 章 + 最早 1 个(卷头)+ 最新的剩余
@@ -400,6 +483,7 @@ def build_chapter_context_payload(project_root: Path, chapter_num: int) -> Dict[
         "genre_profile": contract_context.get("genre_profile", {}),
         "writing_guidance": contract_context.get("writing_guidance", {}),
         "rag_assist": rag_assist,
+        "volume_transition": volume_transition,
     }
 
 
