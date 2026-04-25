@@ -23,6 +23,20 @@ GENRE_INPUT_ALIASES: dict[str, str] = {
     "主播": "直播文",
     "克系": "克苏鲁",
     "克系悬疑": "克苏鲁",
+    "民俗悬疑": "民俗悬疑",
+    "民俗恐怖": "民俗悬疑",
+    "民俗灵异": "民俗悬疑",
+    "官场": "官场探案",
+    "官场文": "官场探案",
+    "官斗": "官场探案",
+    "官场探案": "官场探案",
+    "探案": "官场探案",
+    "民俗悬疑+官场探案": "民俗悬疑",
+    "民俗悬疑/官场探案": "民俗悬疑",
+    "年代文": "年代",
+    "职场文": "职场",
+    "种田": "种田文",
+    "种田文": "种田文",
 }
 
 
@@ -47,6 +61,11 @@ GENRE_PROFILE_KEY_ALIASES: dict[str, str] = {
     "电竞": "esports",
     "直播文": "livestream",
     "克苏鲁": "cosmic-horror",
+    "民俗悬疑": "mystery",
+    "官场探案": "mystery",
+    "年代": "general",
+    "职场": "general",
+    "种田文": "general",
 }
 
 
@@ -63,4 +82,3 @@ def to_profile_key(genre: str) -> str:
         return ""
     normalized = normalize_genre_token(value)
     return GENRE_PROFILE_KEY_ALIASES.get(normalized, normalized.lower())
-

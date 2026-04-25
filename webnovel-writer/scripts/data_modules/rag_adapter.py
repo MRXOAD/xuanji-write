@@ -54,6 +54,7 @@ VECTOR_REQUIRED_COLUMNS = (
 @dataclass
 class SearchResult:
     """搜索结果"""
+
     chunk_id: str
     chapter: int
     scene_index: int
@@ -170,16 +171,10 @@ class RAGAdapter:
             )
         """)
 
-        copy_columns = [
-            col
-            for col in VECTOR_REQUIRED_COLUMNS
-            if col in existing_cols
-        ]
+        copy_columns = [col for col in VECTOR_REQUIRED_COLUMNS if col in existing_cols]
         if copy_columns:
             cols_sql = ", ".join(copy_columns)
-            cursor.execute(
-                f"INSERT OR REPLACE INTO vectors_migrating ({cols_sql}) SELECT {cols_sql} FROM vectors"
-            )
+            cursor.execute(f"INSERT OR REPLACE INTO vectors_migrating ({cols_sql}) SELECT {cols_sql} FROM vectors")
 
         cursor.execute("DROP TABLE vectors")
         cursor.execute("ALTER TABLE vectors_migrating RENAME TO vectors")
@@ -440,20 +435,23 @@ class RAGAdapter:
                 # 将向量序列化为 bytes
                 embedding_bytes = self._serialize_embedding(embedding)
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO vectors
                     (chunk_id, chapter, scene_index, content, embedding, parent_chunk_id, chunk_type, source_file)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    chunk_id,
-                    chunk["chapter"],
-                    chunk.get("scene_index", 0) if chunk_type == "scene" else 0,
-                    chunk.get("content", ""),
-                    embedding_bytes,
-                    chunk.get("parent_chunk_id"),
-                    chunk_type,
-                    chunk.get("source_file"),
-                ))
+                """,
+                    (
+                        chunk_id,
+                        chunk["chapter"],
+                        chunk.get("scene_index", 0) if chunk_type == "scene" else 0,
+                        chunk.get("content", ""),
+                        embedding_bytes,
+                        chunk.get("parent_chunk_id"),
+                        chunk_type,
+                        chunk.get("source_file"),
+                    ),
+                )
 
                 # 同时更新 BM25 索引
                 try:
@@ -477,7 +475,6 @@ class RAGAdapter:
                 skipped,
             )
         if errors:
-
             for err in errors[:5]:  # 最多显示5条
                 logger.warning("%s", err)
 
@@ -486,11 +483,13 @@ class RAGAdapter:
     def _serialize_embedding(self, embedding: List[float]) -> bytes:
         """序列化向量"""
         import struct
+
         return struct.pack(f"{len(embedding)}f", *embedding)
 
     def _deserialize_embedding(self, data: bytes) -> List[float]:
         """反序列化向量"""
         import struct
+
         count = len(data) // 4
         return list(struct.unpack(f"{count}f", data))
 
@@ -520,11 +519,11 @@ class RAGAdapter:
     def _tokenize(self, text: str) -> List[str]:
         """简单分词（中文按字符，英文按单词）"""
         # 中文字符
-        chinese = re.findall(r'[\u4e00-\u9fff]+', text)
+        chinese = re.findall(r"[\u4e00-\u9fff]+", text)
         chinese_chars = list("".join(chinese))
 
         # 英文单词
-        english = re.findall(r'[a-zA-Z]+', text.lower())
+        english = re.findall(r"[a-zA-Z]+", text.lower())
 
         return chinese_chars + english
 
@@ -544,16 +543,22 @@ class RAGAdapter:
         # 插入倒排索引
         for term, count in tf_counter.items():
             tf = count / doc_length if doc_length > 0 else 0
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO bm25_index (term, chunk_id, tf)
                 VALUES (?, ?, ?)
-            """, (term, chunk_id, tf))
+            """,
+                (term, chunk_id, tf),
+            )
 
         # 更新文档统计
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO doc_stats (chunk_id, doc_length)
             VALUES (?, ?)
-        """, (chunk_id, doc_length))
+        """,
+            (chunk_id, doc_length),
+        )
 
     # ==================== 向量检索 ====================
 
@@ -629,17 +634,19 @@ class RAGAdapter:
                 # 计算余弦相似度
                 score = self._cosine_similarity(query_embedding, embedding)
 
-                results.append(SearchResult(
-                    chunk_id=chunk_id,
-                    chapter=chapter,
-                    scene_index=scene_index,
-                    content=content,
-                    score=score,
-                    source="vector",
-                    parent_chunk_id=parent_chunk_id,
-                    chunk_type=chunk_type_value,
-                    source_file=source_file,
-                ))
+                results.append(
+                    SearchResult(
+                        chunk_id=chunk_id,
+                        chapter=chapter,
+                        scene_index=scene_index,
+                        content=content,
+                        score=score,
+                        source="vector",
+                        parent_chunk_id=parent_chunk_id,
+                        chunk_type=chunk_type_value,
+                        source_file=source_file,
+                    )
+                )
 
         # 排序并返回 top_k
         results.sort(key=lambda x: x.score, reverse=True)
@@ -692,12 +699,15 @@ class RAGAdapter:
 
             for term in set(query_terms):
                 # 获取包含该词的文档
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT b.chunk_id, b.tf, d.doc_length
                     FROM bm25_index b
                     JOIN doc_stats d ON b.chunk_id = d.chunk_id
                     WHERE b.term = ?
-                """, (term,))
+                """,
+                    (term,),
+                )
 
                 docs_with_term = cursor.fetchall()
                 df = len(docs_with_term)
@@ -757,17 +767,19 @@ class RAGAdapter:
                     )
                 row = cursor.fetchone()
                 if row:
-                    results.append(SearchResult(
-                        chunk_id=chunk_id,
-                        chapter=row[0],
-                        scene_index=row[1],
-                        content=row[2],
-                        score=score,
-                        source="bm25",
-                        parent_chunk_id=row[3],
-                        chunk_type=row[4],
-                        source_file=row[5],
-                    ))
+                    results.append(
+                        SearchResult(
+                            chunk_id=chunk_id,
+                            chapter=row[0],
+                            scene_index=row[1],
+                            content=row[2],
+                            score=score,
+                            source="bm25",
+                            parent_chunk_id=row[3],
+                            chunk_type=row[4],
+                            source_file=row[5],
+                        )
+                    )
 
         results.sort(key=lambda x: x.score, reverse=True)
         results = results[:top_k]
@@ -881,9 +893,7 @@ class RAGAdapter:
         with self._get_conn() as conn:
             cursor = conn.cursor()
             if chapter is None:
-                cursor.execute(
-                    "SELECT chunk_id, chapter, content FROM vectors ORDER BY chapter DESC, scene_index DESC"
-                )
+                cursor.execute("SELECT chunk_id, chapter, content FROM vectors ORDER BY chapter DESC, scene_index DESC")
             else:
                 cursor.execute(
                     """
@@ -1258,14 +1268,10 @@ class RAGAdapter:
             rrf_scores[result.chunk_id]["score"] += 1 / (k + rank + 1)
 
         # 按 RRF 分数排序
-        sorted_results = sorted(
-            rrf_scores.values(),
-            key=lambda x: x["score"],
-            reverse=True
-        )
+        sorted_results = sorted(rrf_scores.values(), key=lambda x: x["score"], reverse=True)
 
         # 取 top candidates 进行 rerank
-        candidates = [item["result"] for item in sorted_results[:rerank_top_n * 2]]
+        candidates = [item["result"] for item in sorted_results[: rerank_top_n * 2]]
 
         if not candidates:
             final_results: List[SearchResult] = []
@@ -1379,14 +1385,11 @@ class RAGAdapter:
             cursor.execute("SELECT MAX(chapter) FROM vectors")
             max_chapter = cursor.fetchone()[0] or 0
 
-            return {
-                "vectors": vectors,
-                "terms": terms,
-                "max_chapter": max_chapter
-            }
+            return {"vectors": vectors, "terms": terms, "max_chapter": max_chapter}
 
 
 # ==================== CLI 接口 ====================
+
 
 def main():
     import argparse
@@ -1407,6 +1410,13 @@ def main():
     index_parser.add_argument("--chapter", type=int, required=True)
     index_parser.add_argument("--scenes", required=True, help="JSON 格式的场景列表")
     index_parser.add_argument("--summary", required=False, help="章节摘要文本")
+
+    # 一次性扫所有正文章节重建索引(P1-1)
+    rebuild_parser = subparsers.add_parser("rebuild-all", help="扫 正文/*.md 重建向量库")
+    rebuild_parser.add_argument("--from-chapter", type=int, default=1)
+    rebuild_parser.add_argument("--to-chapter", type=int, default=0, help="0 表示一直扫到最后")
+    rebuild_parser.add_argument("--skip-existing", action="store_true", help="已索引的章跳过")
+    rebuild_parser.add_argument("--scene-min-chars", type=int, default=200)
 
     # 搜索
     search_parser = subparsers.add_parser("search")
@@ -1432,16 +1442,18 @@ def main():
     config = None
     if args.project_root:
         # 允许传入“工作区根目录”，统一解析到真正的 book project_root（必须包含 .webnovel/state.json）
-        from project_locator import resolve_project_root
+        from project_locator import resolve_explicit_project_root_or_workspace
         from .config import DataModulesConfig
 
-        resolved_root = resolve_project_root(args.project_root)
+        resolved_root = resolve_explicit_project_root_or_workspace(args.project_root)
         config = DataModulesConfig.from_project_root(resolved_root)
 
     adapter = RAGAdapter(config)
     tool_name = f"rag_adapter:{args.command or 'unknown'}"
 
-    def _append_timing(success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None):
+    def _append_timing(
+        success: bool, *, error_code: str | None = None, error_message: str | None = None, chapter: int | None = None
+    ):
         elapsed_ms = int((time.perf_counter() - command_started_at) * 1000)
         safe_append_perf_timing(
             adapter.config.project_root,
@@ -1521,6 +1533,102 @@ def main():
         else:
             emit_success(result, message="indexed", chapter=args.chapter)
 
+    elif args.command == "rebuild-all":
+        if config is None:
+            emit_error("missing_project_root", "rebuild-all 需要 --project-root")
+            sys.exit(1)
+        proj = Path(config.project_root)
+        text_dir = proj / "正文"
+        if not text_dir.is_dir():
+            emit_error("missing_text_dir", f"找不到 {text_dir}")
+            sys.exit(1)
+
+        chapter_pattern = re.compile(r"^第(\d+)章")
+
+        def _split_scenes(text: str, min_chars: int) -> list[dict]:
+            paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+            scenes: list[dict] = []
+            buf: list[str] = []
+            buf_len = 0
+            for para in paragraphs:
+                if para.startswith("#"):
+                    continue
+                buf.append(para)
+                buf_len += len(para)
+                if buf_len >= min_chars:
+                    scenes.append({"index": len(scenes), "content": "\n\n".join(buf)})
+                    buf, buf_len = [], 0
+            if buf:
+                scenes.append({"index": len(scenes), "content": "\n\n".join(buf)})
+            return scenes
+
+        chapter_files = []
+        for path in sorted(text_dir.glob("第*.md")):
+            m = chapter_pattern.match(path.name)
+            if not m:
+                continue
+            ch_num = int(m.group(1))
+            if ch_num < args.from_chapter:
+                continue
+            if args.to_chapter and ch_num > args.to_chapter:
+                continue
+            chapter_files.append((ch_num, path))
+
+        ok = 0
+        skipped = 0
+        failed = 0
+        for ch_num, path in chapter_files:
+            try:
+                if args.skip_existing:
+                    stats = adapter.get_stats()
+                    indexed = stats.get("chapters_indexed") or []
+                    if ch_num in indexed:
+                        skipped += 1
+                        continue
+                content = path.read_text(encoding="utf-8")
+                scenes = _split_scenes(content, args.scene_min_chars)
+                summary_path = config.webnovel_dir / "summaries" / f"ch{ch_num:04d}.md"
+                summary_text = summary_path.read_text(encoding="utf-8") if summary_path.exists() else None
+
+                chunks = []
+                parent_chunk_id = None
+                if summary_text:
+                    parent_chunk_id = f"ch{ch_num:04d}_summary"
+                    chunks.append(
+                        {
+                            "chapter": ch_num,
+                            "scene_index": 0,
+                            "content": summary_text,
+                            "chunk_type": "summary",
+                            "chunk_id": parent_chunk_id,
+                            "source_file": f"summaries/ch{ch_num:04d}.md",
+                        }
+                    )
+                for s in scenes:
+                    chunks.append(
+                        {
+                            "chapter": ch_num,
+                            "scene_index": s["index"],
+                            "content": s["content"],
+                            "chunk_type": "scene",
+                            "parent_chunk_id": parent_chunk_id,
+                            "chunk_id": f"ch{ch_num:04d}_s{s['index']}",
+                            "source_file": f"正文/{path.name}#scene_{s['index']}",
+                        }
+                    )
+                if chunks:
+                    asyncio.run(adapter.store_chunks(chunks))
+                    ok += 1
+                    print(f"  ch{ch_num:04d}: indexed {len(chunks)} chunks", file=sys.stderr)
+            except Exception as exc:
+                failed += 1
+                print(f"  ch{ch_num:04d}: FAILED {exc}", file=sys.stderr)
+
+        emit_success(
+            {"ok": ok, "skipped": skipped, "failed": failed, "total": len(chapter_files)},
+            message="rebuild-all done",
+        )
+
     elif args.command == "search":
         center_entities: List[str] | None = None
         if getattr(args, "center_entities", None):
@@ -1559,7 +1667,9 @@ def main():
                 )
             )
         else:
-            results = asyncio.run(adapter.hybrid_search(args.query, args.top_k, args.top_k, args.top_k, chunk_type=args.chunk_type))
+            results = asyncio.run(
+                adapter.hybrid_search(args.query, args.top_k, args.top_k, args.top_k, chunk_type=args.chunk_type)
+            )
 
         payload = [r.__dict__ for r in results]
         degraded_reason = adapter.degraded_mode_reason
@@ -1577,6 +1687,7 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()

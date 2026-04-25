@@ -3,9 +3,12 @@
 """
 Data Modules - 配置文件
 
-API 配置通过环境变量读取（支持 .env 文件）：
-- EMBED_BASE_URL, EMBED_MODEL, EMBED_API_KEY
-- RERANK_BASE_URL, RERANK_MODEL, RERANK_API_KEY
+RAG 配置继续从环境变量和 `.env` 读取。
+LLM 写作链额外支持更细的优先级：
+1. 进程环境变量
+2. 书项目 `.env`
+3. 工作区 `.env`
+4. 用户级全局 `~/.codex/webnovel-writer/.env` / `~/.claude/webnovel-writer/.env`
 """
 
 import os
@@ -17,14 +20,32 @@ from runtime_compat import normalize_windows_path
 
 from .context_weights import TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT
 
-def _get_user_claude_root() -> Path:
-    raw = os.environ.get("WEBNOVEL_CLAUDE_HOME") or os.environ.get("CLAUDE_HOME")
-    if raw:
+
+def _resolve_home_path(*env_names: str, default: Path) -> Path:
+    for env_name in env_names:
+        raw = os.environ.get(env_name)
+        if not raw:
+            continue
         try:
             return normalize_windows_path(raw).expanduser().resolve()
         except Exception:
             return normalize_windows_path(raw).expanduser()
-    return (Path.home() / ".claude").resolve()
+    return default.resolve()
+
+
+def _iter_user_tool_roots() -> list[Path]:
+    seen: set[str] = set()
+    roots: list[Path] = []
+    for path in (
+        _resolve_home_path("WEBNOVEL_CODEX_HOME", "CODEX_HOME", default=Path.home() / ".codex"),
+        _resolve_home_path("WEBNOVEL_CLAUDE_HOME", "CLAUDE_HOME", default=Path.home() / ".claude"),
+    ):
+        key = os.path.normcase(str(path))
+        if key in seen:
+            continue
+        seen.add(key)
+        roots.append(path)
+    return roots
 
 
 def _load_dotenv_file(env_path: Path, *, override: bool = False) -> bool:
@@ -54,14 +75,15 @@ def _load_dotenv():
 
     约定：
     - 项目级 `.env`（当前工作目录下）优先；
-    - 全局 `.env` 作为兜底：`~/.claude/webnovel-writer/.env`
+    - 全局 `.env` 作为兜底：优先 `~/.codex/webnovel-writer/.env`，再读 `~/.claude/webnovel-writer/.env`
     """
     # 1) 当前目录（常见：用户从项目根目录执行）
     _load_dotenv_file(Path.cwd() / ".env", override=False)
 
     # 2) 用户级全局（常见：skills/agents 全局安装，API key 放这里最省心）
-    global_env = _get_user_claude_root() / "webnovel-writer" / ".env"
-    _load_dotenv_file(global_env, override=False)
+    for tool_root in _iter_user_tool_roots():
+        global_env = tool_root / "webnovel-writer" / ".env"
+        _load_dotenv_file(global_env, override=False)
 
 
 def _load_project_dotenv(project_root: Path) -> None:
@@ -74,15 +96,82 @@ def _load_project_dotenv(project_root: Path) -> None:
     except Exception:
         return
 
+
+def _read_dotenv_map(env_path: Path) -> dict[str, str]:
+    if not env_path.exists():
+        return {}
+    values: dict[str, str] = {}
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip()
+                if key:
+                    values[key] = value
+    except Exception:
+        return {}
+    return values
+
+
+def _find_workspace_root_for_project(project_root: Path) -> Optional[Path]:
+    for candidate in (project_root, *project_root.parents):
+        if (candidate / ".codex").is_dir() or (candidate / ".claude").is_dir():
+            return candidate
+    return None
+
+
+def _llm_dotenv_candidates(project_root: Path) -> list[Path]:
+    candidates = [project_root / ".env"]
+    workspace_root = _find_workspace_root_for_project(project_root)
+    if workspace_root is not None:
+        candidates.append(workspace_root / ".env")
+    for tool_root in _iter_user_tool_roots():
+        candidates.append(tool_root / "webnovel-writer" / ".env")
+    return candidates
+
+
+def _read_setting_from_sources(project_root: Path, keys: tuple[str, ...], default: str = "") -> str:
+    for key in keys:
+        raw = os.environ.get(key)
+        if raw is not None and str(raw).strip():
+            return str(raw).strip()
+
+    for env_path in _llm_dotenv_candidates(project_root):
+        payload = _read_dotenv_map(env_path)
+        for key in keys:
+            raw = payload.get(key)
+            if raw is not None and str(raw).strip():
+                return str(raw).strip()
+
+    return default
+
+
+def _read_int_setting(project_root: Path, keys: tuple[str, ...], default: int) -> int:
+    raw = _read_setting_from_sources(project_root, keys, default=str(default))
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _read_float_setting(project_root: Path, keys: tuple[str, ...], default: float) -> float:
+    raw = _read_setting_from_sources(project_root, keys, default=str(default))
+    try:
+        return float(str(raw).strip())
+    except (TypeError, ValueError):
+        return float(default)
+
+
 _load_dotenv()
 
 
 def _default_context_template_weights_dynamic() -> dict[str, dict[str, dict[str, float]]]:
     return {
-        stage: {
-            template: dict(weights)
-            for template, weights in templates.items()
-        }
+        stage: {template: dict(weights) for template, weights in templates.items()}
         for stage, templates in TEMPLATE_WEIGHTS_DYNAMIC_DEFAULT.items()
     }
 
@@ -120,10 +209,11 @@ class DataModulesConfig:
     def outline_dir(self) -> Path:
         return self.project_root / "大纲"
 
-
     # ================= Embedding API 配置 =================
     embed_api_type: str = "openai"
-    embed_base_url: str = field(default_factory=lambda: os.getenv("EMBED_BASE_URL", "https://api-inference.modelscope.cn/v1"))
+    embed_base_url: str = field(
+        default_factory=lambda: os.getenv("EMBED_BASE_URL", "https://api-inference.modelscope.cn/v1")
+    )
     embed_model: str = field(default_factory=lambda: os.getenv("EMBED_MODEL", "Qwen/Qwen3-Embedding-8B"))
     embed_api_key: str = field(default_factory=lambda: os.getenv("EMBED_API_KEY", ""))
 
@@ -140,6 +230,20 @@ class DataModulesConfig:
     @property
     def rerank_url(self) -> str:
         return self.rerank_base_url
+
+    # ================= 通用 LLM 写作配置 =================
+    llm_provider: str = "openai_compatible"
+    llm_base_url: str = ""
+    llm_chat_model: str = ""
+    llm_reasoning_model: str = ""
+    llm_api_key: str = ""
+    llm_gateway_token: str = ""
+    deepseek_official_base_url: str = "https://api.deepseek.com"
+    deepseek_official_api_key: str = ""
+    llm_timeout: int = 180
+    llm_temperature: float = 0.7  # P2-4:网文一致性 > 创造性,0.9 偏高
+    llm_review_temperature: float = 0.4
+    llm_max_tokens: int = 4096
 
     # ================= 并发配置 =================
     embed_concurrency: int = 64
@@ -314,6 +418,117 @@ class DataModulesConfig:
 
     def ensure_dirs(self):
         self.webnovel_dir.mkdir(parents=True, exist_ok=True)
+
+    def __post_init__(self) -> None:
+        root = normalize_windows_path(self.project_root).expanduser()
+        try:
+            root = root.resolve()
+        except Exception:
+            root = root
+        self.project_root = root
+
+        self.llm_provider = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_PROVIDER", "WEBNOVEL_LLM_PROVIDER"),
+            default="openai_compatible",
+        )
+        self.llm_base_url = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_BASE_URL", "OPENAI_BASE_URL", "DEEPSEEK_BASE_URL"),
+            default="",
+        )
+        self.llm_chat_model = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_CHAT_MODEL", "OPENAI_MODEL", "DEEPSEEK_CHAT_MODEL", "DEEPSEEK_MODEL"),
+            default="",
+        )
+        if not self.llm_chat_model and _read_setting_from_sources(
+            self.project_root,
+            ("DEEPSEEK_OFFICIAL_API_KEY", "DEEPSEEK_API_KEY"),
+            default="",
+        ):
+            self.llm_chat_model = "deepseek-chat"
+        self.llm_reasoning_model = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_REASONING_MODEL", "DEEPSEEK_REASONING_MODEL"),
+            default="",
+        )
+        if not self.llm_reasoning_model:
+            self.llm_reasoning_model = (
+                "deepseek-reasoner" if self.llm_chat_model == "deepseek-chat" else self.llm_chat_model
+            )
+        self.llm_api_key = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"),
+            default="",
+        )
+        self.llm_gateway_token = _read_setting_from_sources(
+            self.project_root,
+            ("LLM_GATEWAY_TOKEN", "API_GATEWAY_TOKEN", "GATEWAY_TOKEN"),
+            default="",
+        )
+        self.deepseek_official_base_url = _read_setting_from_sources(
+            self.project_root,
+            ("DEEPSEEK_OFFICIAL_BASE_URL",),
+            default="https://api.deepseek.com",
+        )
+        self.deepseek_official_api_key = _read_setting_from_sources(
+            self.project_root,
+            ("DEEPSEEK_OFFICIAL_API_KEY", "DEEPSEEK_API_KEY"),
+            default=self.llm_api_key,
+        )
+        self.llm_timeout = _read_int_setting(
+            self.project_root,
+            ("LLM_TIMEOUT", "DEEPSEEK_TIMEOUT"),
+            default=180,
+        )
+        self.llm_temperature = _read_float_setting(
+            self.project_root,
+            ("LLM_TEMPERATURE", "DEEPSEEK_TEMPERATURE"),
+            default=0.9,
+        )
+        self.llm_review_temperature = _read_float_setting(
+            self.project_root,
+            ("LLM_REVIEW_TEMPERATURE", "DEEPSEEK_REVIEW_TEMPERATURE"),
+            default=0.4,
+        )
+        self.llm_max_tokens = _read_int_setting(
+            self.project_root,
+            ("LLM_MAX_TOKENS", "DEEPSEEK_MAX_TOKENS"),
+            default=4096,
+        )
+
+    @property
+    def deepseek_base_url(self) -> str:
+        return self.llm_base_url
+
+    @property
+    def deepseek_model(self) -> str:
+        return self.llm_chat_model
+
+    @property
+    def deepseek_reasoning_model(self) -> str:
+        return self.llm_reasoning_model
+
+    @property
+    def deepseek_api_key(self) -> str:
+        return self.llm_api_key
+
+    @property
+    def deepseek_timeout(self) -> int:
+        return self.llm_timeout
+
+    @property
+    def deepseek_temperature(self) -> float:
+        return self.llm_temperature
+
+    @property
+    def deepseek_review_temperature(self) -> float:
+        return self.llm_review_temperature
+
+    @property
+    def deepseek_max_tokens(self) -> int:
+        return self.llm_max_tokens
 
     @classmethod
     def from_project_root(cls, project_root: str | Path) -> "DataModulesConfig":

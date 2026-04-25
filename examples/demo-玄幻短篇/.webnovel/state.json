@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "title": "demo-玄幻短篇",
+    "genre": "修仙",
+    "genre_profile_key": "xianxia",
+    "genre_composite": "传统修仙"
+  },
+  "progress": {
+    "current_chapter": 0,
+    "total_words": 0,
+    "current_volume": 1,
+    "volumes_completed": [],
+    "volumes_planned": [
+      {"volume": 1, "title": "入门", "chapters_range": "1-15"},
+      {"volume": 2, "title": "秘境", "chapters_range": "16-30"},
+      {"volume": 3, "title": "议事", "chapters_range": "31-50"}
+    ]
+  },
+  "protagonist_state": {},
+  "relationships": {},
+  "world_settings": {},
+  "plot_threads": {
+    "foreshadowing": []
+  },
+  "review_checkpoints": [],
+  "chapter_meta": {},
+  "strand_tracker": {
+    "history": []
+  }
+}

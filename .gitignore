@@ -1,4 +1,8 @@
 .claude/settings.local.json
+.claude/
+.env
+.env.*
+!.env.example
 
 # Python caches & virtualenv
 __pycache__/
@@ -11,6 +15,19 @@ venv/
 
 # Local runtime data
 .webnovel/
+# Examples 保留初始 state.json + 设定/大纲/正文示例,其他 runtime 排除
+!examples/*/.webnovel/
+!examples/*/.webnovel/state.json
+examples/*/.webnovel/summaries/
+examples/*/.webnovel/logs/
+examples/*/.webnovel/reviews/
+examples/*/.webnovel/context_snapshots/
+examples/*/.webnovel/tmp/
+examples/*/.webnovel/backups/
+examples/*/.webnovel/index.db
+examples/*/.webnovel/external_chapters.json
+examples/*/.webnovel/*.bak
+examples/*/.webnovel/state.json.bak*
 
 # OS / editor
 .DS_Store
@@ -28,6 +45,7 @@ nul
 .tmp/
 .tmp_*
 .tmp_outline_check/
+tmp_verify_*/
 
 # Local research / sibling projects (avoid accidental commit)
 .sisyphus/

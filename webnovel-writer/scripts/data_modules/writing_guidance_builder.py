@@ -226,20 +226,23 @@ def build_guidance_items(
     hook_usage = reader_signal.get("hook_type_usage") or {}
     if hook_usage and hook_diversify_enabled:
         dominant_hook = max(hook_usage.items(), key=lambda kv: kv[1])[0]
-        guidance.append(
-            f"近期钩子类型“{dominant_hook}”使用偏多，本章建议做钩子差异化，避免连续同构。"
-        )
+        guidance.append(f"近期钩子类型“{dominant_hook}”使用偏多，本章建议做钩子差异化，避免连续同构。")
 
     pattern_usage = reader_signal.get("pattern_usage") or {}
     if pattern_usage:
         top_pattern = max(pattern_usage.items(), key=lambda kv: kv[1])[0]
-        guidance.append(
-            f"爽点模式“{top_pattern}”近期高频，本章可保留主爽点但叠加一个新爽点副轴。"
-        )
+        guidance.append(f"爽点模式“{top_pattern}”近期高频，本章可保留主爽点但叠加一个新爽点副轴。")
 
     review_trend = reader_signal.get("review_trend") or {}
     overall_avg = review_trend.get("overall_avg")
-    if isinstance(overall_avg, (int, float)) and float(overall_avg) < low_score_threshold:
+    review_sample = review_trend.get("sample_size") or review_trend.get("count") or 0
+    if (
+        isinstance(overall_avg, (int, float))
+        and float(overall_avg) < low_score_threshold
+        and int(review_sample or 0) > 0
+    ):
+        # 修:只有真实跑过审查才给"均分低"提示。fresh install 状态 sample=0 时跳过,
+        # 避免出现"最近审查均分 0.0"的假阳性警告。
         guidance.append(
             f"最近审查均分{overall_avg:.1f}低于阈值{low_score_threshold:.1f}，建议先保稳：减少跳场、每段补动作结果闭环。"
         )
@@ -391,7 +394,7 @@ def build_writing_checklist(
             weight=default_weight,
             required=False,
             source="methodology.power_guard",
-            verify_hint="至少写清1个机制理由与1个代价。"
+            verify_hint="至少写清1个机制理由与1个代价。",
         )
         _add_item(
             "methodology_antagonist_pressure",

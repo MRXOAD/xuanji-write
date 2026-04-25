@@ -1,17 +1,21 @@
 """
 Webnovel Dashboard - FastAPI 主应用
 
-仅提供 GET 接口（严格只读）；所有文件读取经过 path_guard 防穿越校验。
+默认提供只读接口，并补一组本地动作接口。
+所有文件读取经过 path_guard 防穿越校验；写作动作统一转发到本地 CLI。
 """
 
 import asyncio
 import json
+import shlex
 import sqlite3
+import subprocess
+import sys
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,6 +27,7 @@ from .watcher import FileWatcher
 # 全局状态
 # ---------------------------------------------------------------------------
 _project_root: Path | None = None
+_workspace_root: Path | None = None
 _watcher = FileWatcher()
 
 STATIC_DIR = Path(__file__).parent / "frontend" / "dist"
@@ -34,19 +39,151 @@ def _get_project_root() -> Path:
     return _project_root
 
 
+def _get_workspace_root() -> Optional[Path]:
+    return _workspace_root
+
+
 def _webnovel_dir() -> Path:
     return _get_project_root() / ".webnovel"
+
+
+def _infer_workspace_root(project_root: Path) -> Optional[Path]:
+    for candidate in (project_root, *project_root.parents):
+        if (candidate / ".codex").is_dir() or (candidate / ".claude").is_dir():
+            return candidate.resolve()
+    return None
+
+
+def _webnovel_cli() -> Path:
+    return Path(__file__).resolve().parents[1] / "scripts" / "webnovel.py"
+
+
+def _resolve_action_project_root(payload: dict | None = None) -> Path:
+    raw = str((payload or {}).get("project_root") or "").strip()
+    if raw:
+        return Path(raw).expanduser().resolve()
+    return _get_project_root()
+
+
+def _parse_action_artifacts(stdout: str) -> dict[str, str]:
+    artifacts: dict[str, str] = {}
+    for raw_line in str(stdout or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if ":" in line:
+            key, _, value = line.partition(":")
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                artifacts[key] = value
+            continue
+        if line.startswith("/"):
+            artifacts.setdefault("output_path", line)
+    return artifacts
+
+
+def _run_webnovel_cli(
+    *,
+    args: list[str],
+    project_root: Optional[Path] = None,
+    timeout: int = 1800,
+) -> dict:
+    command = [sys.executable, str(_webnovel_cli())]
+    if project_root is not None:
+        command.extend(["--project-root", str(project_root)])
+    command.extend(args)
+    proc = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    stdout = proc.stdout or ""
+    stderr = proc.stderr or ""
+    return {
+        "ok": proc.returncode == 0,
+        "exit_code": int(proc.returncode),
+        "command": " ".join(shlex.quote(part) for part in command),
+        "stdout": stdout,
+        "stderr": stderr,
+        "artifacts": _parse_action_artifacts(stdout),
+    }
+
+
+def _safe_state_title(project_root: Path) -> str:
+    state_path = project_root / ".webnovel" / "state.json"
+    if not state_path.is_file():
+        return project_root.name
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return project_root.name
+    project_info = payload.get("project_info") if isinstance(payload, dict) else {}
+    if isinstance(project_info, dict):
+        title = str(project_info.get("title") or "").strip()
+        if title:
+            return title
+    return project_root.name
+
+
+def _list_workspace_books(workspace_root: Optional[Path]) -> list[dict]:
+    if workspace_root is None:
+        return []
+    books_dir = workspace_root / "books"
+    if not books_dir.is_dir():
+        return []
+    items: list[dict] = []
+    for child in sorted(books_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        items.append(
+            {
+                "slug": child.name,
+                "path": str(child.resolve()),
+                "title": _safe_state_title(child),
+                "initialized": (child / ".webnovel" / "state.json").is_file(),
+            }
+        )
+    return items
+
+
+def _workspace_info_payload() -> dict:
+    project_root = _get_project_root()
+    workspace_root = _get_workspace_root()
+    llm_info = _run_webnovel_cli(
+        project_root=project_root,
+        args=["llm", "env-check", "--format", "json"],
+        timeout=60,
+    )
+    llm_payload = None
+    try:
+        llm_payload = json.loads(llm_info["stdout"]) if llm_info["stdout"].strip() else None
+    except json.JSONDecodeError:
+        llm_payload = None
+    return {
+        "project_root": str(project_root),
+        "workspace_root": str(workspace_root) if workspace_root is not None else "",
+        "current_title": _safe_state_title(project_root),
+        "books": _list_workspace_books(workspace_root),
+        "llm": llm_payload,
+    }
 
 
 # ---------------------------------------------------------------------------
 # 应用工厂
 # ---------------------------------------------------------------------------
 
-def create_app(project_root: str | Path | None = None) -> FastAPI:
-    global _project_root
+
+def create_app(project_root: str | Path | None = None, workspace_root: str | Path | None = None) -> FastAPI:
+    global _project_root, _workspace_root
 
     if project_root:
         _project_root = Path(project_root).resolve()
+    if workspace_root:
+        _workspace_root = Path(workspace_root).resolve()
+    elif _project_root is not None:
+        _workspace_root = _infer_workspace_root(_project_root)
 
     @asynccontextmanager
     async def _lifespan(_: FastAPI):
@@ -63,7 +200,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
@@ -78,6 +215,108 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         if not state_path.is_file():
             raise HTTPException(404, "state.json 不存在")
         return json.loads(state_path.read_text(encoding="utf-8"))
+
+    @app.get("/api/workspace/info")
+    def workspace_info():
+        return _workspace_info_payload()
+
+    @app.post("/api/actions/use-book")
+    async def action_use_book(payload: dict | None = Body(default=None)):
+        global _project_root, _workspace_root
+        payload = payload or {}
+
+        project_root = _resolve_action_project_root(payload)
+        workspace_root = _get_workspace_root() or _infer_workspace_root(project_root)
+        result = _run_webnovel_cli(
+            args=[
+                "use",
+                str(project_root),
+                *(["--workspace-root", str(workspace_root)] if workspace_root is not None else []),
+            ],
+            timeout=60,
+        )
+        if not result["ok"]:
+            raise HTTPException(status_code=400, detail=result)
+
+        _project_root = project_root
+        _workspace_root = workspace_root or _infer_workspace_root(project_root)
+        _watcher.stop()
+        if _webnovel_dir().is_dir():
+            _watcher.start(_webnovel_dir(), asyncio.get_running_loop())
+
+        return {
+            **result,
+            "workspace": _workspace_info_payload(),
+        }
+
+    @app.post("/api/actions/env-check")
+    def action_env_check(payload: dict | None = Body(default=None)):
+        payload = payload or {}
+        project_root = _resolve_action_project_root(payload)
+        result = _run_webnovel_cli(
+            project_root=project_root,
+            args=["llm", "env-check", "--format", "json"],
+            timeout=60,
+        )
+        try:
+            result["payload"] = json.loads(result["stdout"]) if result["stdout"].strip() else None
+        except json.JSONDecodeError:
+            result["payload"] = None
+        return result
+
+    @app.post("/api/actions/prompt")
+    def action_prompt(payload: dict | None = Body(default=None)):
+        payload = payload or {}
+        project_root = _resolve_action_project_root(payload)
+        chapter = int(payload.get("chapter") or 1)
+        task = str(payload.get("task") or "draft").strip() or "draft"
+        args = ["llm", "prompt", "--chapter", str(chapter), "--task", task]
+        chapter_file = str(payload.get("chapter_file") or "").strip()
+        if chapter_file:
+            args.extend(["--chapter-file", chapter_file])
+        target_words = payload.get("target_words")
+        if target_words is not None:
+            args.extend(["--target-words", str(int(target_words))])
+        return _run_webnovel_cli(project_root=project_root, args=args, timeout=120)
+
+    @app.post("/api/actions/draft")
+    def action_draft(payload: dict | None = Body(default=None)):
+        payload = payload or {}
+        project_root = _resolve_action_project_root(payload)
+        chapter = int(payload.get("chapter") or 1)
+        args = ["llm", "draft", "--chapter", str(chapter)]
+        if payload.get("target_words") is not None:
+            args.extend(["--target-words", str(int(payload["target_words"]))])
+        if payload.get("output"):
+            args.extend(["--output", str(payload["output"])])
+        if payload.get("model"):
+            args.extend(["--model", str(payload["model"])])
+        if payload.get("temperature") is not None:
+            args.extend(["--temperature", str(payload["temperature"])])
+        if payload.get("max_tokens") is not None:
+            args.extend(["--max-tokens", str(int(payload["max_tokens"]))])
+        if payload.get("use_volume_layout"):
+            args.append("--use-volume-layout")
+        args.append("--overwrite")
+        return _run_webnovel_cli(project_root=project_root, args=args)
+
+    @app.post("/api/actions/review")
+    def action_review(payload: dict | None = Body(default=None)):
+        payload = payload or {}
+        project_root = _resolve_action_project_root(payload)
+        chapter = int(payload.get("chapter") or 1)
+        args = ["llm", "review", "--chapter", str(chapter), "--overwrite"]
+        if payload.get("chapter_file"):
+            args.extend(["--chapter-file", str(payload["chapter_file"])])
+        if payload.get("output"):
+            args.extend(["--output", str(payload["output"])])
+        if payload.get("model"):
+            args.extend(["--model", str(payload["model"])])
+        if payload.get("temperature") is not None:
+            args.extend(["--temperature", str(payload["temperature"])])
+        if payload.get("max_tokens") is not None:
+            args.extend(["--max-tokens", str(int(payload["max_tokens"]))])
+        return _run_webnovel_cli(project_root=project_root, args=args)
 
     # ===========================================================
     # API：实体数据库（index.db 只读查询）
@@ -202,9 +441,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
     @app.get("/api/review-metrics")
     def list_review_metrics(limit: int = 20):
         with closing(_get_db()) as conn:
-            rows = conn.execute(
-                "SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,)
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM review_metrics ORDER BY end_chapter DESC LIMIT ?", (limit,)).fetchall()
             return [dict(r) for r in rows]
 
     @app.get("/api/state-changes")
@@ -216,18 +453,14 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                     (entity, limit),
                 ).fetchall()
             else:
-                rows = conn.execute(
-                    "SELECT * FROM state_changes ORDER BY chapter DESC LIMIT ?", (limit,)
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM state_changes ORDER BY chapter DESC LIMIT ?", (limit,)).fetchall()
             return [dict(r) for r in rows]
 
     @app.get("/api/aliases")
     def list_aliases(entity: Optional[str] = None):
         with closing(_get_db()) as conn:
             if entity:
-                rows = conn.execute(
-                    "SELECT * FROM aliases WHERE entity_id = ?", (entity,)
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM aliases WHERE entity_id = ?", (entity,)).fetchall()
             else:
                 rows = conn.execute("SELECT * FROM aliases").fetchall()
             return [dict(r) for r in rows]
@@ -336,6 +569,75 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
             )
 
     # ===========================================================
+    # API：章末硬约束验证（draft_audit）
+    # ===========================================================
+
+    @app.get("/api/audit/{chapter}")
+    def audit_chapter(chapter: int):
+        """对指定章节跑 draft_audit,返回 JSON。"""
+        root = _get_project_root()
+        try:
+            scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            from draft_audit import audit as _audit_call
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"draft_audit 加载失败: {exc}")
+        result = _audit_call(root, chapter)
+        return result
+
+    @app.get("/api/audit")
+    def audit_all(from_chapter: int = 1, to_chapter: int = 0):
+        """扫所有(或指定范围)章节,返回每章 audit 结果列表。
+
+        默认扫到 state.json 的 current_chapter。
+        """
+        root = _get_project_root()
+        try:
+            scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            from draft_audit import audit as _audit_call
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"draft_audit 加载失败: {exc}")
+
+        end_chapter = to_chapter
+        if end_chapter <= 0:
+            state_path = root / ".webnovel" / "state.json"
+            try:
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                end_chapter = int(state.get("progress", {}).get("current_chapter") or 0)
+            except Exception:
+                end_chapter = 0
+        if end_chapter <= 0:
+            return {"results": [], "summary": {"total": 0}}
+
+        results: list[dict] = []
+        pass_n = warn_n = fail_n = 0
+        for ch in range(max(1, from_chapter), end_chapter + 1):
+            r = _audit_call(root, ch)
+            if not r.get("found"):
+                continue
+            r_min = {
+                "chapter": r["chapter"],
+                "verdict": r["verdict"],
+                "errors": r["errors"],
+                "warnings": r["warnings"],
+                "word_count": r["word_count"],
+            }
+            results.append(r_min)
+            if r["verdict"] == "PASS":
+                pass_n += 1
+            elif r["verdict"] == "PASS_WITH_WARN":
+                warn_n += 1
+            else:
+                fail_n += 1
+        return {
+            "results": results,
+            "summary": {"total": len(results), "pass": pass_n, "warn": warn_n, "fail": fail_n},
+        }
+
+    # ===========================================================
     # API：文档浏览（正文/大纲/设定集 —— 只读）
     # ===========================================================
 
@@ -410,6 +712,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
                 return FileResponse(str(index))
             raise HTTPException(404, "前端尚未构建")
     else:
+
         @app.get("/")
         def no_frontend():
             return HTMLResponse(
@@ -424,6 +727,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
 
 def _walk_tree(folder: Path, root: Path) -> list[dict]:
     items = []

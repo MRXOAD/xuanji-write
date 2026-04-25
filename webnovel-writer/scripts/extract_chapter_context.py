@@ -128,9 +128,7 @@ def extract_state_summary(project_root: Path) -> str:
         summary_parts.append(f"**主角实力**: {power.get('realm', '?')} {power.get('layer', '?')}层")
         summary_parts.append(f"**当前位置**: {ps.get('location', '?')}")
         golden_finger = ps.get("golden_finger", {})
-        summary_parts.append(
-            f"**金手指**: {golden_finger.get('name', '?')} Lv.{golden_finger.get('level', '?')}"
-        )
+        summary_parts.append(f"**金手指**: {golden_finger.get('name', '?')} Lv.{golden_finger.get('level', '?')}")
 
     if "strand_tracker" in state:
         tracker = state["strand_tracker"]
@@ -152,10 +150,7 @@ def extract_state_summary(project_root: Path) -> str:
         active = [row for row in foreshadowing if row.get("status") in {"active", "未回收"}]
         urgent = [row for row in active if row.get("urgency", 0) > 50]
         if urgent:
-            urgent_list = [
-                f"{row.get('content', '?')[:30]}... (紧急度:{row.get('urgency')})"
-                for row in urgent[:3]
-            ]
+            urgent_list = [f"{row.get('content', '?')[:30]}... (紧急度:{row.get('urgency')})" for row in urgent[:3]]
             summary_parts.append(f"**紧急伏笔**: {'; '.join(urgent_list)}")
 
     return "\n".join(summary_parts)
@@ -317,14 +312,78 @@ def _load_contract_context(project_root: Path, chapter_num: int) -> Dict[str, An
     }
 
 
+def _select_long_term_context_chapters(project_root: Path, chapter_num: int) -> list[int]:
+    """P1-D 长程上下文:从 5 类来源挑章节摘要(去重)。
+
+    1. 近 2 章(必含)
+    2. 本卷卷头章(让 LLM 记住卷主题)
+    3. 最近一个 quest strand 章(主线)
+    4. 未回收伏笔的原始章(老线索)
+    5. 章号差 100/200 的同卷历史章(跨卷锚点,如果有)
+    """
+    selected: set[int] = set()
+    for prev_ch in range(max(1, chapter_num - 2), chapter_num):
+        selected.add(prev_ch)
+
+    state_path = project_root / ".webnovel" / "state.json"
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except Exception:
+            state = {}
+        progress = state.get("progress", {}) or {}
+        vols = progress.get("volumes_planned", []) or []
+        # 2. 本卷卷头章
+        for v in vols:
+            rng = v.get("chapters_range") or ""
+            if "-" in rng:
+                try:
+                    a, b = rng.split("-", 1)
+                    a, b = int(a), int(b)
+                except ValueError:
+                    continue
+                if a <= chapter_num <= b and a < chapter_num - 2:
+                    selected.add(a)
+                    break
+        # 3. 最近 quest strand 章
+        strand_history = (state.get("strand_tracker") or {}).get("history") or []
+        for entry in reversed(strand_history):
+            if not isinstance(entry, dict):
+                continue
+            ch = int(entry.get("chapter") or 0)
+            if 0 < ch < chapter_num - 2 and entry.get("dominant") == "quest":
+                selected.add(ch)
+                break
+        # 4. 未回收伏笔
+        plot = state.get("plot_threads", {}) or {}
+        for f in (plot.get("foreshadowing") or [])[:3]:
+            if isinstance(f, dict) and f.get("status") != "已回收":
+                planted = int(f.get("planted_chapter") or 0)
+                if 0 < planted < chapter_num - 2:
+                    selected.add(planted)
+
+    return sorted(selected)
+
+
 def build_chapter_context_payload(project_root: Path, chapter_num: int) -> Dict[str, Any]:
     """Assemble full chapter context payload for text/json output."""
     outline = extract_chapter_outline(project_root, chapter_num)
 
     prev_summaries = []
-    for prev_ch in range(max(1, chapter_num - 2), chapter_num):
+    selected_chapters = _select_long_term_context_chapters(project_root, chapter_num)
+    # 限制最多 5 章,避免 prompt 过长
+    if len(selected_chapters) > 5:
+        # 优先保留近 2 章 + 最早 1 个(卷头)+ 最新的剩余
+        recent = [c for c in selected_chapters if c >= chapter_num - 2]
+        old = [c for c in selected_chapters if c < chapter_num - 2]
+        selected_chapters = sorted(set(old[:1] + old[-2:] + recent))[:5]
+    for prev_ch in selected_chapters:
         summary = extract_chapter_summary(project_root, prev_ch)
-        prev_summaries.append(f"### 第{prev_ch}章摘要\n{summary}")
+        # 标注章节性质
+        tag = ""
+        if prev_ch < chapter_num - 5:
+            tag = f"(跨段锚点:第{prev_ch}章)"
+        prev_summaries.append(f"### 第{prev_ch}章摘要{tag}\n{summary}")
 
     state_summary = extract_state_summary(project_root)
     contract_context = _load_contract_context(project_root, chapter_num)
@@ -512,11 +571,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        project_root = (
-            find_project_root(Path(args.project_root))
-            if args.project_root
-            else find_project_root()
-        )
+        project_root = find_project_root(Path(args.project_root)) if args.project_root else find_project_root()
         payload = build_chapter_context_payload(project_root, args.chapter)
 
         if args.format == "json":
@@ -533,4 +588,3 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         enable_windows_utf8_stdio()
     main()
-

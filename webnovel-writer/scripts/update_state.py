@@ -52,7 +52,7 @@ from pathlib import Path
 
 from runtime_compat import enable_windows_utf8_stdio
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 # ============================================================================
 # 安全修复：导入安全工具函数（P1 MEDIUM）
@@ -67,6 +67,7 @@ from data_modules.state_validator import (
 # Windows 编码兼容性修复
 if sys.platform == "win32":
     enable_windows_utf8_stdio()
+
 
 class StateUpdater:
     """state.json 安全更新器"""
@@ -86,7 +87,7 @@ class StateUpdater:
             "relationships",
             "world_settings",
             "plot_threads",
-            "review_checkpoints"
+            "review_checkpoints",
         ]
 
         for key in required_keys:
@@ -100,14 +101,14 @@ class StateUpdater:
         has_nested_power = "power" in ps and isinstance(ps.get("power"), dict)
         has_flat_power = "realm" in ps
         if not (has_nested_power or has_flat_power):
-            print(f"❌ 缺少 protagonist_state.power 或 protagonist_state.realm 字段")
+            print("❌ 缺少 protagonist_state.power 或 protagonist_state.realm 字段")
             return False
 
         # location 字段：支持 location.current 或直接 location
         has_nested_location = isinstance(ps.get("location"), dict) and "current" in ps.get("location", {})
         has_flat_location = isinstance(ps.get("location"), str)
         if not (has_nested_location or has_flat_location):
-            print(f"❌ 缺少 protagonist_state.location 字段")
+            print("❌ 缺少 protagonist_state.location 字段")
             return False
 
         # 验证并补全 strand_tracker 结构（兼容旧 state.json）
@@ -143,7 +144,7 @@ class StateUpdater:
             return False
 
         try:
-            with open(self.state_file, 'r', encoding='utf-8') as f:
+            with open(self.state_file, "r", encoding="utf-8") as f:
                 self.state = json.load(f)
 
             if not self._validate_schema(self.state):
@@ -195,7 +196,7 @@ class StateUpdater:
             print(f"❌ 保存失败: {e}")
             # 尝试从备份恢复
             if restore_from_backup(self.state_file):
-                print(f"✅ 已从备份恢复")
+                print("✅ 已从备份恢复")
             return False
 
     def update_protagonist_power(self, realm: str, layer: int, bottleneck: str):
@@ -204,11 +205,7 @@ class StateUpdater:
         # 检测当前格式
         if "power" in ps and isinstance(ps.get("power"), dict):
             # 嵌套格式
-            ps["power"] = {
-                "realm": realm,
-                "layer": layer,
-                "bottleneck": bottleneck if bottleneck != "null" else None
-            }
+            ps["power"] = {"realm": realm, "layer": layer, "bottleneck": bottleneck if bottleneck != "null" else None}
         else:
             # 平铺格式
             ps["realm"] = realm
@@ -222,10 +219,7 @@ class StateUpdater:
         # 检测当前格式
         if isinstance(ps.get("location"), dict):
             # 嵌套格式
-            ps["location"] = {
-                "current": location,
-                "last_chapter": chapter
-            }
+            ps["location"] = {"current": location, "last_chapter": chapter}
         else:
             # 平铺格式
             ps["location"] = location
@@ -275,20 +269,22 @@ class StateUpdater:
 
         target_chapter = planted_chapter + 100
 
-        self.state["plot_threads"]["foreshadowing"].append({
-            "content": content,
-            "status": status,
-            "added_at": datetime.now().strftime("%Y-%m-%d"),
-            "planted_chapter": planted_chapter,
-            "target_chapter": target_chapter,
-            "tier": "支线"
-        })
+        self.state["plot_threads"]["foreshadowing"].append(
+            {
+                "content": content,
+                "status": status,
+                "added_at": datetime.now().strftime("%Y-%m-%d"),
+                "planted_chapter": planted_chapter,
+                "target_chapter": target_chapter,
+                "tier": "支线",
+            }
+        )
         print(f"📝 添加伏笔: {content}（{status}）")
 
     def resolve_foreshadowing(self, content: str, chapter: int):
         """回收伏笔"""
         if "foreshadowing" not in self.state["plot_threads"]:
-            print(f"❌ 未找到伏笔列表")
+            print("❌ 未找到伏笔列表")
             return
 
         for item in self.state["plot_threads"]["foreshadowing"]:
@@ -307,6 +303,8 @@ class StateUpdater:
         self.state["progress"]["current_chapter"] = current_chapter
         self.state["progress"]["total_words"] = total_words
         self.state["progress"]["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.state["current_chapter"] = current_chapter
+        self.state["total_words"] = total_words
         print(f"📝 更新进度: 第{current_chapter}章, 总字数: {total_words}")
 
     def mark_volume_planned(self, volume: int, chapters_range: str):
@@ -322,11 +320,9 @@ class StateUpdater:
                 item["updated_at"] = datetime.now().strftime("%Y-%m-%d")
                 return
 
-        self.state["progress"]["volumes_planned"].append({
-            "volume": volume,
-            "chapters_range": chapters_range,
-            "planned_at": datetime.now().strftime("%Y-%m-%d")
-        })
+        self.state["progress"]["volumes_planned"].append(
+            {"volume": volume, "chapters_range": chapters_range, "planned_at": datetime.now().strftime("%Y-%m-%d")}
+        )
         print(f"📝 标记第{volume}卷已规划: 第{chapters_range}章")
 
     def add_review_checkpoint(self, chapters_range: str, report_file: str):
@@ -334,11 +330,13 @@ class StateUpdater:
         if "review_checkpoints" not in self.state:
             self.state["review_checkpoints"] = []
 
-        self.state["review_checkpoints"].append({
-            "chapters": chapters_range,
-            "report": report_file,
-            "reviewed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+        self.state["review_checkpoints"].append(
+            {
+                "chapters": chapters_range,
+                "report": report_file,
+                "reviewed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
         print(f"📝 添加审查记录: 第{chapters_range}章 → {report_file}")
 
     def update_strand_tracker(self, strand: str, chapter: int):
@@ -359,7 +357,7 @@ class StateUpdater:
                 "last_constellation_chapter": 0,
                 "current_dominant": None,
                 "chapters_since_switch": 0,
-                "history": []
+                "history": [],
             }
 
         tracker = self.state["strand_tracker"]
@@ -375,20 +373,18 @@ class StateUpdater:
             tracker["chapters_since_switch"] += 1
 
         # 添加到历史记录
-        tracker["history"].append({
-            "chapter": chapter,
-            "dominant": strand
-        })
+        tracker["history"].append({"chapter": chapter, "dominant": strand})
 
         # 只保留最近50章的历史（避免文件过大）
         if len(tracker["history"]) > 50:
             tracker["history"] = tracker["history"][-50:]
 
-        print(f"✅ strand_tracker 已更新")
+        print("✅ strand_tracker 已更新")
         print(f"   - 第{chapter}章主导情节线: {strand}")
         print(f"   - 该情节线已连续{tracker['chapters_since_switch']}章")
 
         return True
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -419,127 +415,114 @@ def main():
     --protagonist-power "金丹" 3 "雷劫" \
     --progress 45 198765 \
     --relationship "李雪" affection 95
-        """
+        """,
     )
 
     parser.add_argument(
-        '--project-root',
+        "--project-root",
         default=None,
-        help='项目根目录（包含 .webnovel/state.json）。不提供时自动搜索（支持 webnovel-project/ 与父目录）。'
+        help="项目根目录（包含 .webnovel/state.json）。不提供时自动搜索（支持 webnovel-project/ 与父目录）。",
     )
 
     parser.add_argument(
-        '--state-file',
+        "--state-file",
         default=None,
-        help='state.json 文件路径（可选）。不提供时从项目根目录自动定位为 .webnovel/state.json。'
+        help="state.json 文件路径（可选）。不提供时从项目根目录自动定位为 .webnovel/state.json。",
     )
 
-    parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='预览模式，不执行实际写入'
-    )
+    parser.add_argument("--dry-run", action="store_true", help="预览模式，不执行实际写入")
 
     # 主角状态更新
     parser.add_argument(
-        '--protagonist-power',
-        nargs=3,
-        metavar=('REALM', 'LAYER', 'BOTTLENECK'),
-        help='更新主角实力（境界 层数 瓶颈）'
+        "--protagonist-power", nargs=3, metavar=("REALM", "LAYER", "BOTTLENECK"), help="更新主角实力（境界 层数 瓶颈）"
     )
 
     parser.add_argument(
-        '--protagonist-location',
-        nargs=2,
-        metavar=('LOCATION', 'CHAPTER'),
-        help='更新主角位置（地点 章节号）'
+        "--protagonist-location", nargs=2, metavar=("LOCATION", "CHAPTER"), help="更新主角位置（地点 章节号）"
     )
 
     parser.add_argument(
-        '--golden-finger',
-        nargs=3,
-        metavar=('NAME', 'LEVEL', 'COOLDOWN'),
-        help='更新金手指（名称 等级 冷却天数）'
+        "--golden-finger", nargs=3, metavar=("NAME", "LEVEL", "COOLDOWN"), help="更新金手指（名称 等级 冷却天数）"
     )
 
     # 人际关系更新
     parser.add_argument(
-        '--relationship',
+        "--relationship",
         nargs=3,
-        action='append',
-        metavar=('CHAR_NAME', 'KEY', 'VALUE'),
-        help='更新人际关系（角色名 属性 值）'
+        action="append",
+        metavar=("CHAR_NAME", "KEY", "VALUE"),
+        help="更新人际关系（角色名 属性 值）",
     )
 
     # 伏笔管理
-    parser.add_argument(
-        '--add-foreshadowing',
-        nargs=2,
-        metavar=('CONTENT', 'STATUS'),
-        help='添加伏笔（内容 状态）'
-    )
+    parser.add_argument("--add-foreshadowing", nargs=2, metavar=("CONTENT", "STATUS"), help="添加伏笔（内容 状态）")
 
     parser.add_argument(
-        '--resolve-foreshadowing',
-        nargs=2,
-        metavar=('CONTENT', 'CHAPTER'),
-        help='回收伏笔（内容 章节号）'
+        "--resolve-foreshadowing", nargs=2, metavar=("CONTENT", "CHAPTER"), help="回收伏笔（内容 章节号）"
     )
 
     # 进度更新
     parser.add_argument(
-        '--progress',
-        nargs=2,
-        type=int,
-        metavar=('CHAPTER', 'WORDS'),
-        help='更新进度（当前章节 总字数）'
+        "--progress", nargs=2, type=int, metavar=("CHAPTER", "WORDS"), help="更新进度（当前章节 总字数）"
     )
 
     # 卷规划
-    parser.add_argument(
-        '--volume-planned',
-        type=int,
-        metavar='VOLUME',
-        help='标记卷已规划（卷号）'
-    )
+    parser.add_argument("--volume-planned", type=int, metavar="VOLUME", help="标记卷已规划（卷号）")
 
-    parser.add_argument(
-        '--chapters-range',
-        metavar='RANGE',
-        help='章节范围（如 "1-100"）'
-    )
+    parser.add_argument("--chapters-range", metavar="RANGE", help='章节范围（如 "1-100"）')
 
     # 审查记录
     parser.add_argument(
-        '--add-review',
-        nargs=2,
-        metavar=('CHAPTERS_RANGE', 'REPORT_FILE'),
-        help='添加审查记录（章节范围 报告文件）'
+        "--add-review", nargs=2, metavar=("CHAPTERS_RANGE", "REPORT_FILE"), help="添加审查记录（章节范围 报告文件）"
     )
 
     # Strand Tracker 更新
     parser.add_argument(
-        '--strand-dominant',
+        "--strand-dominant",
         nargs=2,
-        metavar=('STRAND', 'CHAPTER'),
-        help='更新主导情节线（quest/fire/constellation 章节号）'
+        metavar=("STRAND", "CHAPTER"),
+        help="更新主导情节线（quest/fire/constellation 章节号）",
+    )
+
+    # 题材更新（P0-2）
+    parser.add_argument(
+        "--set-genre",
+        metavar="GENRE",
+        help='修改题材，会自动规范化为标准名。例: "民俗悬疑" / "民俗悬疑+官场探案" / "修仙"',
+    )
+    parser.add_argument(
+        "--set-genre-composite",
+        metavar="COMPOSITE",
+        help="附加题材复合标签（可选），写入 state.project_info.genre_composite",
+    )
+
+    # 卷规划自校准（P1-3）
+    parser.add_argument(
+        "--audit-volumes",
+        action="store_true",
+        help="按 progress.current_chapter 重算 current_volume / volumes_completed,纠正卷漂移",
     )
 
     args = parser.parse_args()
 
     # 如果没有任何更新参数，显示帮助并退出
-    if not any([
-        args.protagonist_power,
-        args.protagonist_location,
-        args.golden_finger,
-        args.relationship,
-        args.add_foreshadowing,
-        args.resolve_foreshadowing,
-        args.progress,
-        args.volume_planned,
-        args.add_review,
-        args.strand_dominant
-    ]):
+    if not any(
+        [
+            args.protagonist_power,
+            args.protagonist_location,
+            args.golden_finger,
+            args.relationship,
+            args.add_foreshadowing,
+            args.resolve_foreshadowing,
+            args.progress,
+            args.volume_planned,
+            args.add_review,
+            args.strand_dominant,
+            args.set_genre,
+            args.set_genre_composite,
+            args.audit_volumes,
+        ]
+    ):
         parser.print_help()
         sys.exit(1)
 
@@ -610,6 +593,72 @@ def main():
             strand, chapter = args.strand_dominant
             updater.update_strand_tracker(strand, int(chapter))
 
+        # 题材更新（P0-2）
+        if args.set_genre or args.set_genre_composite:
+            try:
+                from data_modules.genre_aliases import normalize_genre_token, to_profile_key
+            except Exception:
+                # 脚本单独跑时补 sys.path
+                _here = Path(__file__).resolve().parent
+                if str(_here) not in sys.path:
+                    sys.path.insert(0, str(_here))
+                from data_modules.genre_aliases import normalize_genre_token, to_profile_key
+            project_info = updater.state.setdefault("project_info", {})
+            if args.set_genre:
+                raw = args.set_genre
+                normalized = normalize_genre_token(raw)
+                profile_key = to_profile_key(normalized)
+                old_genre = project_info.get("genre")
+                project_info["genre"] = normalized
+                project_info["genre_profile_key"] = profile_key
+                print(f"✓ 题材: {old_genre!r} → {normalized!r} (profile={profile_key})")
+                if not profile_key or profile_key == normalized.lower():
+                    print("  ⚠️  该题材在 genre_aliases.py 中未注册 profile key，已回退为小写原值")
+            if args.set_genre_composite:
+                project_info["genre_composite"] = args.set_genre_composite
+                print(f"✓ 题材复合: {args.set_genre_composite!r}")
+
+        # 卷规划自校准（P1-3）
+        if args.audit_volumes:
+            progress = updater.state.get("progress", {})
+            current_ch = int(progress.get("current_chapter") or 0)
+            vols = progress.get("volumes_planned") or []
+
+            def _in_range(ch: int, rng: str) -> bool:
+                if not isinstance(rng, str) or "-" not in rng:
+                    return False
+                try:
+                    a, b = rng.split("-", 1)
+                    return int(a) <= ch <= int(b)
+                except ValueError:
+                    return False
+
+            current_v = next(
+                (int(v["volume"]) for v in vols if _in_range(current_ch, v.get("chapters_range", ""))),
+                None,
+            )
+            completed: list[int] = []
+            for v in vols:
+                rng = v.get("chapters_range") or ""
+                if "-" not in rng:
+                    continue
+                try:
+                    end = int(rng.split("-", 1)[1])
+                except ValueError:
+                    continue
+                if end < current_ch:
+                    completed.append(int(v["volume"]))
+
+            old_v = progress.get("current_volume")
+            old_completed = progress.get("volumes_completed") or []
+            progress["current_volume"] = current_v
+            progress["volumes_completed"] = sorted(set(completed))
+            print(
+                f"✓ audit-volumes: current_chapter={current_ch} "
+                f"current_volume={old_v} → {current_v} "
+                f"completed={old_completed} → {sorted(set(completed))}"
+            )
+
         # 保存更新
         if not updater.save():
             sys.exit(1)
@@ -617,17 +666,18 @@ def main():
         print("\n✅ 更新完成！")
 
         if not args.dry_run:
-            print(f"\n💡 提示:")
+            print("\n💡 提示:")
             print(f"  - 原文件已备份: {updater.backup_file}")
             print(f"  - 如需回滚，可复制备份文件到 {updater.state_file}")
 
     except Exception as e:
         print(f"\n❌ 更新失败: {e}")
         if updater.backup_file and os.path.exists(updater.backup_file):
-            print(f"🔄 正在回滚...")
+            print("🔄 正在回滚...")
             shutil.copy2(updater.backup_file, updater.state_file)
-            print(f"✅ 已回滚到备份版本")
+            print("✅ 已回滚到备份版本")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

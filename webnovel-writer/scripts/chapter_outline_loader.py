@@ -109,6 +109,39 @@ def _extract_outline_section(content: str, chapter_num: int) -> str | None:
     return None
 
 
+def _find_stage_scaffold_segment(outline_dir: Path, chapter_num: int) -> str | None:
+    """从阶段支架文件抽该章所在段(降级大纲)。"""
+    candidates = list(outline_dir.glob("*阶段支架*.md")) + list(outline_dir.glob("*支架*.md"))
+    seen: set[Path] = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            if not line.strip().startswith("|"):
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if not cells:
+                continue
+            m = re.match(r"^\s*(\d+)\s*-\s*(\d+)\s*$", cells[0])
+            if not m:
+                continue
+            lo, hi = int(m.group(1)), int(m.group(2))
+            if lo <= chapter_num <= hi:
+                headers = ["章节", "主体内容", "主爽点", "必回收线", "没回收完的问题", "本段不能做的事"]
+                fields = [f"- {h}: {v}" for h, v in zip(headers, cells)]
+                return (
+                    f"[阶段支架降级大纲(来自 {path.name},未提供逐章细纲)]\n"
+                    + "\n".join(fields)
+                    + f"\n\n建议:跑 draft 前在 大纲/ 下补一份第 {chapter_num} 章的细纲文件。"
+                )
+    return None
+
+
 def load_chapter_outline(project_root: Path, chapter_num: int, max_chars: int | None = 1500) -> str:
     outline_dir = project_root / "大纲"
 
@@ -117,13 +150,15 @@ def load_chapter_outline(project_root: Path, chapter_num: int, max_chars: int | 
         return split_outline.read_text(encoding="utf-8")
 
     volume_outline = _find_volume_outline_file(project_root, chapter_num)
-    if volume_outline is None:
-        return f"⚠️ 大纲文件不存在：第 {chapter_num} 章"
+    if volume_outline is not None:
+        outline = _extract_outline_section(volume_outline.read_text(encoding="utf-8"), chapter_num)
+        if outline is not None:
+            if max_chars and len(outline) > max_chars:
+                return outline[:max_chars] + "\n...(已截断)"
+            return outline
 
-    outline = _extract_outline_section(volume_outline.read_text(encoding="utf-8"), chapter_num)
-    if outline is None:
-        return f"⚠️ 未找到第 {chapter_num} 章的大纲"
+    scaffold = _find_stage_scaffold_segment(outline_dir, chapter_num)
+    if scaffold is not None:
+        return scaffold
 
-    if max_chars and len(outline) > max_chars:
-        return outline[:max_chars] + "\n...(已截断)"
-    return outline
+    return f"⚠️ 大纲文件不存在：第 {chapter_num} 章(在 大纲/ 下放 `第{chapter_num}章-XXX.md`,或在 `*阶段支架*.md` 表格里加该章号所在段)"

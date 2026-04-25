@@ -1,0 +1,302 @@
+{
+  "project_info": {
+    "title": "demo-都市悬疑",
+    "genre": "悬疑灵异",
+    "genre_profile_key": "mystery",
+    "genre_composite": "都市悬疑+连环案"
+  },
+  "progress": {
+    "current_chapter": 3,
+    "total_words": 7816,
+    "current_volume": 1,
+    "volumes_completed": [],
+    "volumes_planned": [
+      {
+        "volume": 1,
+        "title": "末班车",
+        "chapters_range": "1-15"
+      },
+      {
+        "volume": 2,
+        "title": "模式浮现",
+        "chapters_range": "16-30"
+      },
+      {
+        "volume": 3,
+        "title": "12 楼对峙",
+        "chapters_range": "31-50"
+      }
+    ],
+    "last_updated": "2026-04-25 12:24:44"
+  },
+  "protagonist_state": {
+    "name": "陈晓白",
+    "age": 32,
+    "occupation": "网约车司机(前刑警)",
+    "realm": "凡人",
+    "power": {
+      "realm": "凡人",
+      "layer": 0,
+      "bottleneck": "无"
+    },
+    "location": {
+      "current": "S 市槐安里",
+      "last_chapter": 0
+    }
+  },
+  "relationships": {
+    "allies": [],
+    "enemies": []
+  },
+  "world_settings": {
+    "city": "S 市",
+    "time": "2025-2026",
+    "locale": "中国长江下游"
+  },
+  "plot_threads": {
+    "foreshadowing": [
+      {
+        "content": "女乘客中途下车后消失，巷子尽头无路，鞋印突然中断",
+        "status": "未回收",
+        "planted_chapter": 1,
+        "where": "第1章，陈晓白和李建国在无名巷检查现场",
+        "ts": 1777091022,
+        "tier": "支线"
+      },
+      {
+        "content": "遗落的口红底部刻着'L. 雪'，与五年前林雪失踪案物证相似",
+        "status": "未回收",
+        "planted_chapter": 1,
+        "where": "第1章，陈晓白捡起口红并查看底部刻字",
+        "ts": 1777091022,
+        "tier": "支线"
+      },
+      {
+        "content": "半瓶水瓶底有白色沉淀物，可能被下药",
+        "status": "未回收",
+        "planted_chapter": 1,
+        "where": "第1章，陈晓白在副驾驶储物箱检查水瓶",
+        "ts": 1777091022,
+        "tier": "支线"
+      },
+      {
+        "content": "邻居周鸣拎着黑色塑料袋，底部有暗红色干涸污渍",
+        "status": "未回收",
+        "planted_chapter": 1,
+        "where": "第1章，陈晓白在12楼电梯口遇到周鸣",
+        "ts": 1777091022,
+        "tier": "支线"
+      },
+      {
+        "content": "行车记录仪拍到女乘客的耳环内侧刻着数字'805'",
+        "status": "未回收",
+        "planted_chapter": 1,
+        "where": "第1章，陈晓白查看行车记录仪画面",
+        "ts": 1777091022,
+        "tier": "支线"
+      },
+      {
+        "content": "乘客留下的口红刻有‘L. 雪 2025’，与五年前林雪案物证中的‘L. 雪’同款，暗示有人定制了同款口红",
+        "status": "未回收",
+        "planted_chapter": 2,
+        "where": "办案室桌上，陈晓白拿出口红，李建国取出物证袋对比",
+        "ts": 1777091060,
+        "tier": "支线"
+      },
+      {
+        "content": "乘客‘王莉’使用虚拟号注册，只打了一单，身份可疑",
+        "status": "未回收",
+        "planted_chapter": 2,
+        "where": "陈晓白提及乘客注册信息，赵凯推断为虚拟号",
+        "ts": 1777091060,
+        "tier": "支线"
+      },
+      {
+        "content": "楼下白色面包车中戴口罩的男人，身穿社区医院定制白大褂（细蓝边），与周鸣的制服相同",
+        "status": "未回收",
+        "planted_chapter": 2,
+        "where": "陈晓白在窗边看到面包车，司机穿白大褂，与周鸣的款式一致",
+        "ts": 1777091060,
+        "tier": "支线"
+      },
+      {
+        "content": "落款‘Z’的来信提到姐姐五年前在南桥附近失踪，细节与陈晓白五年前办砸的林雪案吻合",
+        "status": "未回收",
+        "planted_chapter": 3,
+        "where": "第3章，林栀念信时",
+        "ts": 1777091089
+      },
+      {
+        "content": "陈晓白发现昨晚失踪案与五年前林雪案细节相似，包括南桥、周二凌晨、豆沙色口红",
+        "status": "未回收",
+        "planted_chapter": 3,
+        "where": "第3章，陈晓白听节目后回忆",
+        "ts": 1777091089
+      },
+      {
+        "content": "周鸣医生在1202室自言自语‘她这周又收到信了’，暗示他与林栀节目或来信有关",
+        "status": "未回收",
+        "planted_chapter": 3,
+        "where": "第3章，陈晓白经过1202室时",
+        "ts": 1777091089
+      },
+      {
+        "content": "林栀拒绝与陈晓白面谈，只接受邮件或信件沟通",
+        "status": "未回收",
+        "planted_chapter": 3,
+        "where": "第3章，林栀回复邮件时",
+        "ts": 1777091089
+      }
+    ],
+    "active_threads": [
+      "女乘客中途下车后消失，巷子尽头无路，鞋印突然中断",
+      "遗落的口红底部刻着'L. 雪'，与五年前林雪失踪案物证相似",
+      "半瓶水瓶底有白色沉淀物，可能被下药"
+    ]
+  },
+  "review_checkpoints": [],
+  "chapter_meta": {
+    "0001": {
+      "title": "凌晨一点四十，南桥的路灯把影子拉成细长一条。",
+      "hook": "805。",
+      "hook_type": "情绪钩",
+      "hook_strength": "weak",
+      "coolpoint_patterns": [
+        "查错破局"
+      ],
+      "micropayoffs": [],
+      "dominant": "quest",
+      "location": "",
+      "characters": [
+        "陈晓白"
+      ],
+      "updated_at": "2026-04-25 12:23:37",
+      "source": "llm_adapter.sync"
+    },
+    "0002": {
+      "title": "上午九点半，市公安局刑侦支队的走廊里飘着劣质咖啡的味道。",
+      "hook": "但那件白大褂的领口，他记得很清楚——细蓝边，社区医院的定制款式，整个S市只有那家医院用这种设计。",
+      "hook_type": "行动钩",
+      "hook_strength": "medium",
+      "coolpoint_patterns": [],
+      "micropayoffs": [],
+      "dominant": "quest",
+      "location": "",
+      "characters": [
+        "陈晓白"
+      ],
+      "updated_at": "2026-04-25 12:24:17",
+      "source": "llm_adapter.sync"
+    },
+    "0003": {
+      "title": "晚上十点四十分，陈晓白把车停在槐安里西门对面的临时停车位上，没熄火。今晚的订单少，跑了两小时才接了四单，流水还不到一百块。",
+      "hook": "他为什么在听林栀的节目？为什么说“又收到信了”？",
+      "hook_type": "悬念钩",
+      "hook_strength": "strong",
+      "coolpoint_patterns": [
+        "查错破局",
+        "夺证翻账"
+      ],
+      "micropayoffs": [],
+      "dominant": "quest",
+      "location": "",
+      "characters": [
+        "陈晓白"
+      ],
+      "updated_at": "2026-04-25 12:24:44",
+      "source": "llm_adapter.sync"
+    }
+  },
+  "strand_tracker": {
+    "history": [
+      {
+        "chapter": 1,
+        "dominant": "quest",
+        "strand": "quest"
+      },
+      {
+        "chapter": 2,
+        "dominant": "quest",
+        "strand": "quest"
+      },
+      {
+        "chapter": 3,
+        "dominant": "quest",
+        "strand": "quest"
+      }
+    ],
+    "last_quest_chapter": 3,
+    "last_fire_chapter": 0,
+    "last_constellation_chapter": 0,
+    "current_dominant": "quest",
+    "chapters_since_switch": 3
+  },
+  "current_chapter": 3,
+  "total_words": 7816,
+  "foreshadowing": [
+    {
+      "content": "女乘客中途下车后消失，巷子尽头无路，鞋印突然中断",
+      "status": "未回收",
+      "planted_chapter": 1,
+      "where": "第1章，陈晓白和李建国在无名巷检查现场",
+      "ts": 1777091022,
+      "tier": "支线"
+    },
+    {
+      "content": "遗落的口红底部刻着'L. 雪'，与五年前林雪失踪案物证相似",
+      "status": "未回收",
+      "planted_chapter": 1,
+      "where": "第1章，陈晓白捡起口红并查看底部刻字",
+      "ts": 1777091022,
+      "tier": "支线"
+    },
+    {
+      "content": "半瓶水瓶底有白色沉淀物，可能被下药",
+      "status": "未回收",
+      "planted_chapter": 1,
+      "where": "第1章，陈晓白在副驾驶储物箱检查水瓶",
+      "ts": 1777091022,
+      "tier": "支线"
+    },
+    {
+      "content": "邻居周鸣拎着黑色塑料袋，底部有暗红色干涸污渍",
+      "status": "未回收",
+      "planted_chapter": 1,
+      "where": "第1章，陈晓白在12楼电梯口遇到周鸣",
+      "ts": 1777091022,
+      "tier": "支线"
+    },
+    {
+      "content": "行车记录仪拍到女乘客的耳环内侧刻着数字'805'",
+      "status": "未回收",
+      "planted_chapter": 1,
+      "where": "第1章，陈晓白查看行车记录仪画面",
+      "ts": 1777091022,
+      "tier": "支线"
+    },
+    {
+      "content": "乘客留下的口红刻有‘L. 雪 2025’，与五年前林雪案物证中的‘L. 雪’同款，暗示有人定制了同款口红",
+      "status": "未回收",
+      "planted_chapter": 2,
+      "where": "办案室桌上，陈晓白拿出口红，李建国取出物证袋对比",
+      "ts": 1777091060,
+      "tier": "支线"
+    },
+    {
+      "content": "乘客‘王莉’使用虚拟号注册，只打了一单，身份可疑",
+      "status": "未回收",
+      "planted_chapter": 2,
+      "where": "陈晓白提及乘客注册信息，赵凯推断为虚拟号",
+      "ts": 1777091060,
+      "tier": "支线"
+    },
+    {
+      "content": "楼下白色面包车中戴口罩的男人，身穿社区医院定制白大褂（细蓝边），与周鸣的制服相同",
+      "status": "未回收",
+      "planted_chapter": 2,
+      "where": "陈晓白在窗边看到面包车，司机穿白大褂，与周鸣的款式一致",
+      "ts": 1777091060,
+      "tier": "支线"
+    }
+  ]
+}
