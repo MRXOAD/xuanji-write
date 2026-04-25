@@ -5,7 +5,13 @@
 
 中文长篇网文连续生成框架。这本书已经写到 300 章 / 106.7 万字,deepseek-chat 单章 28 秒。
 
-![dashboard](docs/img/dashboard.png)
+React dashboard(实时):
+
+![react dashboard](docs/img/dashboard-react-full.png)
+
+Streamlit vibe(进度面板):
+
+![streamlit](docs/img/dashboard.png)
 
 ## 这工具解决什么问题
 
