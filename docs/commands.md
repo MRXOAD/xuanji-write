@@ -99,3 +99,28 @@
 产出：
 
 - `.webnovel/project_memory.json`
+
+## `webnovel.py llm ...`
+
+用途：不走 Claude Skill，直接从本地 CLI 调兼容 `OpenAI-compatible` 的模型接口。
+
+示例：
+
+```bash
+python -X utf8 webnovel-writer/scripts/webnovel.py --project-root "<BOOK_ROOT>" llm env-check
+python -X utf8 webnovel-writer/scripts/webnovel.py --project-root "<BOOK_ROOT>" llm prompt --chapter 12 --task draft
+python -X utf8 webnovel-writer/scripts/webnovel.py --project-root "<BOOK_ROOT>" llm draft --chapter 12
+python -X utf8 webnovel-writer/scripts/webnovel.py --project-root "<BOOK_ROOT>" llm review --chapter 12
+```
+
+支持的子命令：
+
+- `env-check`：检查 `LLM_*` 配置
+- `prompt`：打印将发送给模型的消息
+- `draft`：生成章节初稿，默认写到 `正文/`
+- `review`：生成审稿报告，默认写到 `.webnovel/reviews/`
+
+兼容说明：
+
+- 旧命令 `webnovel.py deepseek ...` 还保留
+- 旧子命令 `write` 还保留，等同于 `draft`
