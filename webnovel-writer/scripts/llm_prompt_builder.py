@@ -279,8 +279,9 @@ def build_write_messages(
         f"{anti_repeat_section}"
         f"{transition_section}\n"
         "输出格式：\n"
-        f"# 第{chapter_num}章\n"
-        "接着直接写正文。不要附加“本章完”“作者的话”“创作说明”。"
+        f"# 第{chapter_num}章 <6-12 字标题>\n"
+        "标题用本章核心情节做提炼,不要写'未命名'。然后直接写正文。\n"
+        "不要附加'本章完'、'作者的话'、'创作说明'。"
     )
     return [
         {"role": "system", "content": system_prompt},
