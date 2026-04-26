@@ -175,6 +175,9 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--project-root", required=True)
     p.add_argument("--chapter", type=int, help="提取该章的伏笔")
+    p.add_argument("--from-chapter", type=int, help="批量回填起始章")
+    p.add_argument("--to-chapter", type=int, help="批量回填结束章")
+    p.add_argument("--parallel", type=int, default=3, help="批量回填并发数")
     p.add_argument("--no-llm", action="store_true", help="只更新 state(读已有数据,不调 LLM)")
     p.add_argument("--list-open", action="store_true", help="列出未回收伏笔")
     p.add_argument("--max-age", type=int, default=30, help="多少章未回收算 open")
@@ -182,6 +185,53 @@ def main() -> int:
     args = p.parse_args()
 
     project_root = Path(args.project_root)
+
+    # 批量回填模式: LLM 抽取并发, state 写入串行(避免 read-modify-write 竞争)
+    if args.from_chapter and args.to_chapter:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        chapters = list(range(args.from_chapter, args.to_chapter + 1))
+        print(f"批量回填 {len(chapters)} 章 (parallel={args.parallel}, 写 state 串行)")
+
+        # 阶段 1: 并发跑 LLM 抽取
+        payloads: dict[int, dict] = {}
+        extract_err = 0
+
+        def _extract(ch: int) -> tuple[int, dict | None, str]:
+            try:
+                p = extract_via_llm(project_root, ch)
+                return ch, p, "" if p is not None else "extract returned None"
+            except Exception as exc:
+                return ch, None, str(exc)[:120]
+
+        with ThreadPoolExecutor(max_workers=max(1, args.parallel)) as pool:
+            futures = {pool.submit(_extract, ch): ch for ch in chapters}
+            for fut in as_completed(futures):
+                ch, payload, err = fut.result()
+                if payload is None:
+                    print(f"✗ ch{ch:04d} extract: {err}", file=sys.stderr)
+                    extract_err += 1
+                else:
+                    payloads[ch] = payload
+
+        # 阶段 2: 串行写 state(按章号顺序)
+        total_added = 0
+        write_err = 0
+        for ch in sorted(payloads.keys()):
+            try:
+                added = update_state_with_foreshadowing(project_root, ch, payloads[ch])
+                if added:
+                    print(f"✓ ch{ch:04d} +{added} 条伏笔")
+                    total_added += added
+                else:
+                    print(f"- ch{ch:04d} 无新伏笔")
+            except Exception as exc:
+                print(f"✗ ch{ch:04d} write: {str(exc)[:120]}", file=sys.stderr)
+                write_err += 1
+
+        total_err = extract_err + write_err
+        print(f"\n汇总: 新增 {total_added} 条伏笔, extract 错 {extract_err}, write 错 {write_err}")
+        return 0 if total_err == 0 else 2
 
     if args.list_open:
         items = list_open_foreshadowing(project_root, max_age=args.max_age)
