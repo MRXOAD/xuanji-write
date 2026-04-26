@@ -262,20 +262,27 @@ def audit(project_root: Path, chapter_num: int, strict: bool = False) -> dict:
 
     # 6. 韩五尺死了/暴毙类语句(本书设定他没真死)
     han_dead_pat = re.compile(r"韩五尺.{0,8}(死了|暴毙|尸首|断了气|没气了)")
+    # 否定语:出现这些词意味着上下文在说他"没真死",应放行
+    han_alive_pat = re.compile(r"(死不了|没死|还活|没真死|假死|报了死|报死|死讯|对外|告示|你死|管账上|名下)")
+    # "报死了 ... 的人"这种是说"报死他名下的人",不是说他自己死
+    han_report_others_pat = re.compile(r"报死了.{0,12}(的人|名单|名字|账上)")
     for i, line in enumerate(lines, 1):
-        if han_dead_pat.search(line):
-            # 排除"告示""死讯"这类描述死讯通告的句子(合法)
-            if "告示" in line or "死讯" in line or "对外" in line:
-                continue
-            issues.append(
-                {
-                    "level": "error",
-                    "type": "han_setting_break",
-                    "line": i,
-                    "content": line.strip()[:80],
-                    "msg": f"L{i}: 韩五尺写死违反设定(他被州里带走未真死) — {line.strip()[:40]}",
-                }
-            )
+        if not han_dead_pat.search(line):
+            continue
+        # 同行有"没死/活着/对外死讯/报死的是别人"等否定语 → 跳过
+        if han_alive_pat.search(line):
+            continue
+        if han_report_others_pat.search(line):
+            continue
+        issues.append(
+            {
+                "level": "error",
+                "type": "han_setting_break",
+                "line": i,
+                "content": line.strip()[:80],
+                "msg": f"L{i}: 韩五尺写死违反设定(他被州里带走未真死) — {line.strip()[:40]}",
+            }
+        )
 
     # 7. 姐姐错名
     sister_pat = re.compile(r"许晚照|许晚晴|韩三娘")
