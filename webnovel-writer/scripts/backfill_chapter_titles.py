@@ -99,7 +99,8 @@ def _update_state_meta(project_root: Path, chapter_num: int, title: str) -> None
     state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def process_chapter(project_root: Path, chapter_num: int, *, dry_run: bool) -> dict:
+def extract_title_only(project_root: Path, chapter_num: int) -> dict:
+    """阶段 1: 只跑 LLM 抽题目, 不改文件 / state。线程安全。"""
     loaded = _load_chapter(project_root, chapter_num)
     if not loaded:
         return {"chapter": chapter_num, "status": "skip", "reason": "no flat file"}
@@ -110,7 +111,23 @@ def process_chapter(project_root: Path, chapter_num: int, *, dry_run: bool) -> d
         return {"chapter": chapter_num, "status": "error", "reason": str(exc)[:200]}
     if not title:
         return {"chapter": chapter_num, "status": "error", "reason": "empty title"}
+    return {
+        "chapter": chapter_num,
+        "status": "extracted",
+        "path": path,
+        "text": text,
+        "title": title,
+    }
 
+
+def apply_title_serial(project_root: Path, item: dict, *, dry_run: bool) -> dict:
+    """阶段 2: 改文件 + 更新 state。串行调用,无并发竞争。"""
+    chapter_num = item["chapter"]
+    if item["status"] != "extracted":
+        return item
+    title = item["title"]
+    path = item["path"]
+    text = item["text"]
     if dry_run:
         return {"chapter": chapter_num, "status": "dry-run", "title": title}
 
@@ -133,6 +150,14 @@ def process_chapter(project_root: Path, chapter_num: int, *, dry_run: bool) -> d
     }
 
 
+# 向后兼容(单章手工调用还能用)
+def process_chapter(project_root: Path, chapter_num: int, *, dry_run: bool) -> dict:
+    item = extract_title_only(project_root, chapter_num)
+    if item["status"] != "extracted":
+        return item
+    return apply_title_serial(project_root, item, dry_run=dry_run)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--project-root", required=True)
@@ -146,23 +171,38 @@ def main() -> int:
     chapters = list(range(args.from_chapter, args.to_chapter + 1))
 
     print(f"backfill {len(chapters)} 章 (parallel={args.parallel}{', dry-run' if args.dry_run else ''})")
+    print(f"阶段 1: LLM 抽题目并发 {args.parallel}; 阶段 2: 改文件 + 写 state 串行")
 
-    results: list[dict] = []
+    # 阶段 1: 并发跑 LLM 抽题目
+    extracted: dict[int, dict] = {}
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-        futures = {pool.submit(process_chapter, project_root, ch, dry_run=args.dry_run): ch for ch in chapters}
+        futures = {pool.submit(extract_title_only, project_root, ch): ch for ch in chapters}
         for fut in as_completed(futures):
             r = fut.result()
-            results.append(r)
+            extracted[r["chapter"]] = r
             ch = r["chapter"]
             status = r["status"]
-            if status == "ok":
-                print(f"✓ ch{ch:04d} → {r['title']} (file: {r['new_path']})")
-            elif status == "dry-run":
-                print(f"… ch{ch:04d} → {r['title']} (dry-run)")
+            if status == "extracted":
+                pass  # 阶段 2 再报
             elif status == "skip":
                 print(f"- ch{ch:04d} 跳过: {r['reason']}")
             else:
-                print(f"✗ ch{ch:04d} 错误: {r.get('reason')}", file=sys.stderr)
+                print(f"✗ ch{ch:04d} 抽题目失败: {r.get('reason')}", file=sys.stderr)
+
+    # 阶段 2: 串行写文件 + state
+    results: list[dict] = []
+    for ch in sorted(extracted.keys()):
+        r = apply_title_serial(project_root, extracted[ch], dry_run=args.dry_run)
+        results.append(r)
+        status = r["status"]
+        if status == "ok":
+            print(f"✓ ch{ch:04d} → {r['title']} (file: {r['new_path']})")
+        elif status == "dry-run":
+            print(f"… ch{ch:04d} → {r['title']} (dry-run)")
+        elif status == "skip":
+            pass  # 已在阶段 1 报
+        else:
+            print(f"✗ ch{ch:04d} 写入失败: {r.get('reason')}", file=sys.stderr)
 
     ok = sum(1 for r in results if r["status"] == "ok")
     skip = sum(1 for r in results if r["status"] == "skip")
