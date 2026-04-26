@@ -159,10 +159,47 @@ def audit(project_root: Path, chapter_num: int, strict: bool = False) -> dict:
     transition_ranges = _read_transition_ranges(project_root)
     in_transition = _in_transition(chapter_num, transition_ranges)
 
-    # 1. 修仙词黑名单
+    # 1. 修仙词黑名单(每个词额外算"上下文豁免",避免常见组词被切错误判)
+    # 形式:{词: 该词附近若出现这些字符则放行(切词错位 / 比喻 / 人名)}
+    XIANXIA_FALSE_POSITIVE = {
+        "道行": [
+            "避道行",  # 避道 + 行(礼) — 街道避让
+            "一道行",  # 一道 + 行文 / 行书
+            "几道行",
+            "两道行",
+            "许道行",  # 人名:许三更父亲
+        ],
+        "经脉": [
+            "血肉经脉",  # 比喻基础设施
+            "山川经脉",  # 比喻地理
+            "城市经脉",
+        ],
+    }
+
+    def _all_hits_are_false_positive(word: str, full_text: str) -> bool:
+        exemptions = XIANXIA_FALSE_POSITIVE.get(word, [])
+        if not exemptions:
+            return False
+        # 找所有 word 出现位置
+        idx = 0
+        while True:
+            pos = full_text.find(word, idx)
+            if pos == -1:
+                return True
+            # 取 [pos-2, pos+len(word)+2] 上下文,看是不是任一豁免组词
+            window_start = max(0, pos - 2)
+            window_end = min(len(full_text), pos + len(word) + 2)
+            window = full_text[window_start:window_end]
+            if not any(ex in window for ex in exemptions):
+                return False
+            idx = pos + 1
+
     for word in XIANXIA_BLACKLIST:
         if word in text:
             count = text.count(word)
+            # 每次命中都在豁免上下文里 → 跳过
+            if _all_hits_are_false_positive(word, text):
+                continue
             issues.append(
                 {
                     "level": "warn" if in_transition else "error",
@@ -263,7 +300,15 @@ def audit(project_root: Path, chapter_num: int, strict: bool = False) -> dict:
     # 6. 韩五尺死了/暴毙类语句(本书设定他没真死)
     han_dead_pat = re.compile(r"韩五尺.{0,8}(死了|暴毙|尸首|断了气|没气了)")
     # 否定语:出现这些词意味着上下文在说他"没真死",应放行
-    han_alive_pat = re.compile(r"(死不了|没死|还活|没真死|假死|报了死|报死|死讯|对外|告示|你死|管账上|名下)")
+    # 加 v3:锁门 / 改名换籍 / 引用别人话里出现"死"的场景
+    han_alive_pat = re.compile(
+        r"(死不了|没死|还活|没真死|假死|报了死|报死|死讯|对外|告示|你死|管账上|名下"
+        r"|锁死|关死|堵死|钉死"  # 动作"锁/关/堵/钉死",不是人死
+        r"|改名|换名|换籍|换字|顶名|换一字|换一地"  # 制度上"死"换名活
+        r"|新册|旧册|册上|空棺|义庄"  # "册上死了"是改名
+        r"|你爹死|爹死|死人姓|死人字"  # 引用别人台词里说"X 死了"
+        r")"
+    )
     # "报死了 ... 的人"这种是说"报死他名下的人",不是说他自己死
     han_report_others_pat = re.compile(r"报死了.{0,12}(的人|名单|名字|账上)")
     for i, line in enumerate(lines, 1):
