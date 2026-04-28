@@ -158,8 +158,18 @@ def _detect_chapter_characters(outline_text: str, project_root: Optional[Path]) 
     return names
 
 
-def _load_voice_samples(project_root: Optional[Path], names: list[str], k: int = 4) -> str:
-    """读 设定集/语料库/<角色>.md,每人挑 k 条样本拼成块。"""
+def _load_voice_samples(
+    project_root: Optional[Path],
+    names: list[str],
+    k: int = 4,
+    chapter_num: Optional[int] = None,
+    window: int = 100,
+) -> str:
+    """读 设定集/语料库/<角色>.md,每人挑 k 条样本拼成块。
+
+    chapter_num 给定时按章号窗口取样:优先挑距离当前章 ≤ window 章的样本,
+    数量不够再用全本最近的补,目的是体现"许三更 17 岁→中后期"语气演变。
+    """
     if not project_root or not names:
         return ""
     lib_dir = Path(project_root) / "设定集" / "语料库"
@@ -177,6 +187,28 @@ def _load_voice_samples(project_root: Optional[Path], names: list[str], k: int =
         items = [line for line in text.splitlines() if line.startswith("- 第")]
         if not items:
             continue
+        if chapter_num and chapter_num > 0:
+            import re as _re
+
+            scored: list[tuple[int, str]] = []
+            for ln in items:
+                m = _re.match(r"- 第(\d+)章", ln)
+                if not m:
+                    continue
+                ch = int(m.group(1))
+                if ch >= chapter_num:
+                    continue
+                dist = chapter_num - ch
+                scored.append((dist, ln))
+            scored.sort(key=lambda x: x[0])
+            in_window = [ln for d, ln in scored if d <= window]
+            if len(in_window) >= k:
+                items = in_window[:k]
+            else:
+                items = in_window + [ln for d, ln in scored if d > window][: max(0, k - len(in_window))]
+                items = items[:k]
+            if not items:
+                continue
         sections.append(f"### {name}")
         sections.extend(items[:k])
     return "\n".join(sections)
@@ -215,7 +247,7 @@ def build_write_messages(
     # P1-A 角色言行风格库:从本章大纲匹配出场角色,各挑 4 条历史样本
     outline_text = str(payload.get("outline") or "")
     chapter_chars = _detect_chapter_characters(outline_text, project_root)
-    voice_block = _load_voice_samples(project_root, chapter_chars, k=4)
+    voice_block = _load_voice_samples(project_root, chapter_chars, k=4, chapter_num=chapter_num, window=100)
     voice_section = f"\n【角色言行样本(模仿语气,不要照抄)】\n{voice_block}\n" if voice_block else ""
 
     # P1-B 伏笔追踪:注入超 20 章未推进的悬念
@@ -267,10 +299,35 @@ def build_write_messages(
             block_lines.append(scaffold)
         transition_section = "\n【卷头 transition 注入】\n" + "\n".join(block_lines) + "\n"
 
+    # 三层长程摘要(全书 → 卷 → 段),按距离从远到近排
+    book_main = str(payload.get("book_main") or "").strip()
+    book_section = ""
+    if book_main:
+        book_section = f"\n【全书主线骨架(整本书来龙去脉,优先于一切单章细节)】\n{book_main}\n"
+
+    volume_summaries = payload.get("volume_summaries") or []
+    vol_section = ""
+    if volume_summaries:
+        parts = []
+        for v in volume_summaries:
+            parts.append(f"### 第 {v.get('volume')} 卷卷摘要\n{v.get('body', '')}")
+        vol_section = "\n【近 1-2 卷卷摘要(2000 字/卷)】\n" + "\n\n".join(parts) + "\n"
+
+    segment_summaries = payload.get("segment_summaries") or []
+    seg_section = ""
+    if segment_summaries:
+        parts = []
+        for s in segment_summaries:
+            parts.append(f"### 第 {s.get('start')}-{s.get('end')} 章段摘要\n{s.get('body', '')}")
+        seg_section = "\n【近 5 段段摘要(每段 5 章合并)】\n" + "\n\n".join(parts) + "\n"
+
     user_prompt = (
         f"请写第 {chapter_num} 章，目标篇幅约 {target_words} 字。\n\n"
         f"【本章大纲】\n{payload.get('outline', '')}\n\n"
-        f"【前文摘要】\n{render_previous_summaries(payload.get('previous_summaries', []))}\n\n"
+        f"{book_section}"
+        f"{vol_section}"
+        f"{seg_section}"
+        f"【近章详细摘要】\n{render_previous_summaries(payload.get('previous_summaries', []))}\n\n"
         f"【当前状态】\n{payload.get('state_summary', '')}\n\n"
         f"【写作提示】\n{render_guidance(payload)}\n\n"
         f"【RAG 线索】\n{render_rag_hits(payload)}\n"

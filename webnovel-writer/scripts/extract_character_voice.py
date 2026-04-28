@@ -108,16 +108,47 @@ def extract_voice(project_root: Path, max_samples: int = 12) -> dict[str, list[d
             # 取该行作为样本(已限长度)
             samples[name].append({"chapter": ch_num, "sample": line_stripped})
 
-    # 每人挑最有代表性的 max_samples 条:按章节均匀采样
+    # 按章号分桶取样:每 100 章一桶,各取代表样本,密度比"全本均匀"更高。
+    # 默认 max_samples=24,每桶平均 3 条,800 章 8 桶,体现成长曲线。
     result: dict[str, list[dict]] = {}
+    bucket_size = 100
     for name, items in samples.items():
+        if not items:
+            continue
         if len(items) <= max_samples:
-            result[name] = items
-        else:
-            # 均匀采样
-            step = len(items) / max_samples
-            picked = [items[int(step * i)] for i in range(max_samples)]
-            result[name] = picked
+            result[name] = sorted(items, key=lambda x: x["chapter"])
+            continue
+        buckets: dict[int, list[dict]] = {}
+        for it in items:
+            b = (it["chapter"] - 1) // bucket_size
+            buckets.setdefault(b, []).append(it)
+        per = max(1, max_samples // max(1, len(buckets)))
+        picked: list[dict] = []
+        for b in sorted(buckets.keys()):
+            inside = buckets[b]
+            if len(inside) <= per:
+                picked.extend(inside)
+            else:
+                step = len(inside) / per
+                picked.extend(inside[int(step * i)] for i in range(per))
+        # 不够 max_samples 时,从最大桶补
+        if len(picked) < max_samples:
+            remain = max_samples - len(picked)
+            picked_set = {(p["chapter"], p["sample"]) for p in picked}
+            extra: list[dict] = []
+            for b in sorted(buckets.keys(), key=lambda x: -len(buckets[x])):
+                for it in buckets[b]:
+                    key = (it["chapter"], it["sample"])
+                    if key in picked_set:
+                        continue
+                    extra.append(it)
+                    picked_set.add(key)
+                    if len(extra) >= remain:
+                        break
+                if len(extra) >= remain:
+                    break
+            picked.extend(extra)
+        result[name] = sorted(picked, key=lambda x: x["chapter"])[:max_samples]
     return result
 
 
@@ -167,7 +198,7 @@ def load_voice_for_prompt(project_root: Path, names: list[str], k: int = 4) -> s
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--project-root", required=True)
-    p.add_argument("--max-samples", type=int, default=12)
+    p.add_argument("--max-samples", type=int, default=24)
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
 

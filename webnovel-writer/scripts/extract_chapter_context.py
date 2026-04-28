@@ -472,10 +472,40 @@ def build_chapter_context_payload(project_root: Path, chapter_num: int) -> Dict[
     contract_context = _load_contract_context(project_root, chapter_num)
     rag_assist = _load_rag_assist(project_root, chapter_num, outline)
 
+    # 段摘要 / 卷摘要 / 全书主线(三层长程摘要)
+    segment_summaries: list[dict] = []
+    volume_summaries: list[dict] = []
+    book_main = ""
+    try:
+        from build_segment_summaries import list_segments_before
+        from build_volume_summaries import (
+            find_volume_for_chapter,
+            load_volume_summary,
+        )
+        from build_book_main import load_book_main
+
+        for s, e, body in list_segments_before(project_root, chapter_num, count=5):
+            segment_summaries.append({"start": s, "end": e, "body": body})
+
+        cur_vol = find_volume_for_chapter(project_root, chapter_num)
+        if cur_vol:
+            for vn in (cur_vol - 2, cur_vol - 1):
+                if vn >= 1:
+                    body = load_volume_summary(project_root, vn)
+                    if body:
+                        volume_summaries.append({"volume": vn, "body": body})
+
+        book_main = load_book_main(project_root)
+    except Exception:
+        pass
+
     return {
         "chapter": chapter_num,
         "outline": outline,
         "previous_summaries": prev_summaries,
+        "segment_summaries": segment_summaries,
+        "volume_summaries": volume_summaries,
+        "book_main": book_main,
         "state_summary": state_summary,
         "context_contract_version": contract_context.get("context_contract_version"),
         "context_weight_stage": contract_context.get("context_weight_stage"),
