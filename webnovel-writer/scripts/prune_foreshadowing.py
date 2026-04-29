@@ -127,11 +127,15 @@ def main() -> int:
         print("❌ LLM 返回空数组,放弃改动", file=sys.stderr)
         return 2
 
-    # 给每条加个 ts 字段
+    # 给每条加个 ts 字段; planted_chapter 强转 int 避免 LLM 返回字符串导致 sort 失败
     now = int(time.time())
     for x in pruned:
         x.setdefault("status", "未回收")
         x.setdefault("ts", now)
+        try:
+            x["planted_chapter"] = int(x.get("planted_chapter") or 0)
+        except (TypeError, ValueError):
+            x["planted_chapter"] = 0
 
     # 按 importance(tier)排序作展示
     tier_order = {"主线": 0, "支线": 1, "细节": 2}
@@ -153,7 +157,12 @@ def main() -> int:
     # 写新
     plot["foreshadowing"] = pruned
     state["plot_threads"] = plot
-    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        from security_utils import atomic_write_json
+
+        atomic_write_json(state_path, state, use_lock=True, backup=True, indent=2)
+    except Exception:
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✓ 已写入 {len(pruned)} 条精简伏笔")
 
     # 简单分布

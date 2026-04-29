@@ -36,7 +36,14 @@ def _load_state(project_root: Path) -> dict:
 
 def _save_state(project_root: Path, state: dict) -> None:
     sp = _state_path(project_root)
-    sp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 走 atomic_write_json + filelock,避免并发损坏 state.json
+    try:
+        from security_utils import atomic_write_json
+
+        atomic_write_json(sp, state, use_lock=True, backup=True, indent=2)
+    except Exception:
+        # 最坏情况退回普通写,至少别死
+        sp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _find_chapter_file(project_root: Path, chapter_num: int) -> Path | None:

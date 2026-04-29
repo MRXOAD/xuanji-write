@@ -96,7 +96,12 @@ def _update_state_meta(project_root: Path, chapter_num: int, title: str) -> None
     key = f"{chapter_num:04d}"
     meta = chapter_meta.setdefault(key, {})
     meta["title"] = title
-    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        from security_utils import atomic_write_json
+
+        atomic_write_json(state_path, state, use_lock=True, backup=True, indent=2)
+    except Exception:
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def extract_title_only(project_root: Path, chapter_num: int) -> dict:
