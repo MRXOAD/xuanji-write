@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -13,9 +13,7 @@ MARKETPLACE_JSON_PATH = ROOT / ".claude-plugin" / "marketplace.json"
 README_PATH = ROOT / "README.md"
 PLUGIN_NAME = "webnovel-writer"
 VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
-README_ROW_PATTERN = re.compile(
-    r"^\| \*\*v(?P<version>[^\s*]+)(?P<current> \(当前\))?\*\* \| (?P<notes>.*) \|$"
-)
+README_ROW_PATTERN = re.compile(r"^\| \*\*v(?P<version>[^\s*]+)(?P<current> \(当前\))?\*\* \| (?P<notes>.*) \|$")
 README_HEADER = "| 版本 | 说明 |"
 README_SEPARATOR = "|------|------|"
 
@@ -69,8 +67,11 @@ def format_readme_row(version: str, notes: str, is_current: bool) -> str:
     return f"| **v{version}{marker}** | {notes.strip()} |"
 
 
-def get_readme_current_version(content: str) -> str:
+def get_readme_current_version(content: str) -> str | None:
+    """README 已不维护版本表时返回 None(版本展示交给 Release 徽章);有表但格式坏仍报错。"""
     rows = parse_readme_rows(content.splitlines())
+    if not rows:
+        return None
     current_rows = [row for row in rows if row["is_current"]]
     if len(current_rows) != 1:
         raise ValueError("README.md must contain exactly one current release row")
@@ -82,8 +83,9 @@ def update_readme_release(content: str, version: str, release_notes: str | None)
 
     try:
         header_index = next(index for index, line in enumerate(lines) if line.strip() == README_HEADER)
-    except StopIteration as error:
-        raise ValueError("README.md release table header not found") from error
+    except StopIteration:
+        # README 已不维护版本表(2026-04 重写后版本展示交给 Release 徽章), 跳过 README 更新
+        return content
 
     separator_index = header_index + 1
     if separator_index >= len(lines) or lines[separator_index].strip() != README_SEPARATOR:
@@ -99,9 +101,7 @@ def update_readme_release(content: str, version: str, release_notes: str | None)
 
     if target_row is None:
         if not release_notes:
-            raise ValueError(
-                "Release notes are required when the target version does not exist in README.md"
-            )
+            raise ValueError("Release notes are required when the target version does not exist in README.md")
         lines.insert(separator_index + 1, format_readme_row(version, release_notes, True))
 
     return "\n".join(lines) + "\n"
@@ -149,15 +149,11 @@ def check_versions(expected_version: str | None = None) -> int:
 
     mismatches: list[str] = []
     if plugin_version != marketplace_version:
-        mismatches.append(
-            f"plugin.json={plugin_version}, marketplace.json={marketplace_version}"
-        )
-    if plugin_version != readme_version:
+        mismatches.append(f"plugin.json={plugin_version}, marketplace.json={marketplace_version}")
+    if readme_version is not None and plugin_version != readme_version:
         mismatches.append(f"plugin.json={plugin_version}, README.md={readme_version}")
     if expected_version and plugin_version != expected_version:
-        mismatches.append(
-            f"expected={expected_version}, current release metadata={plugin_version}"
-        )
+        mismatches.append(f"expected={expected_version}, current release metadata={plugin_version}")
 
     if mismatches:
         print("Version mismatch detected:")
