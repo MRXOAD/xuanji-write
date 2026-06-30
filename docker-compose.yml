@@ -70,7 +70,7 @@ services:
   # 平时不用,用户手工本地跑 npm run dev 更快
   # ──────────────────────────────────────────
   react-dev:
-    image: node:20-slim
+    image: node:22-slim
     container_name: xuanji-react-dev
     profiles: ["dev"]
     working_dir: /frontend
