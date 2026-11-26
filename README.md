@@ -1,29 +1,17 @@
-<p align="center">
+<p>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-dark.png" />
     <source media="(prefers-color-scheme: light)" srcset="docs/img/banner-light.png" />
-    <img alt="xuanji-write — 中文长篇网文 LLM 续写框架" src="docs/img/banner-dark.png" width="100%" />
+    <img alt="xuanji-write" src="docs/img/banner-dark.png" width="100%" />
   </picture>
 </p>
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3-38BDF8?style=flat-square" alt="License" /></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-38BDF8?style=flat-square&logo=python&logoColor=white" alt="Python" /></a>
-  <a href="https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml"><img src="https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/MRXOAD/xuanji-write/releases"><img src="https://img.shields.io/github/v/release/MRXOAD/xuanji-write?style=flat-square&label=Release&color=10B981" alt="Release" /></a>
-</p>
+[![License](https://img.shields.io/badge/License-GPL%20v3-5B9BF8.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10+-5B9BF8.svg)](https://www.python.org/)
+[![CI](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml/badge.svg)](https://github.com/MRXOAD/xuanji-write/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/MRXOAD/xuanji-write?label=Release)](https://github.com/MRXOAD/xuanji-write/releases)
 
-<p align="center">
-  中文长篇网文 LLM 续写框架 · 单章 28 秒 · <code>deepseek-chat</code> 单章 $0.003–$0.01
-</p>
-
-<p align="center">
-  <a href="#一分钟跑通-demo">快速开始</a> ·
-  <a href="#11-层一致性堵漏">11 层一致性</a> ·
-  <a href="#实时面板">实时面板</a> ·
-  <a href="#cli-速查">CLI 速查</a> ·
-  <a href="#文档">文档索引</a>
-</p>
+中文长篇网文 LLM 续写框架。单章 28 秒，deepseek-chat 单章 $0.003-$0.01。
 
 ![dashboard](docs/img/dashboard-react-full.png)
 
